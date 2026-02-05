@@ -72,3 +72,15 @@ clawos/
 
 Designed as an OpenClaw plugin first, standalone library second.
 Hook point: tool execution pipeline (wraps existing calls, non-invasive).
+
+### Real-World Deployment
+
+**Session Integrity Plugin** — Layer 0 is deployed as an OpenClaw plugin:
+- Location: `~/.openclaw/extensions/session-integrity/`
+- Prevents session corruption from content filter blocks
+- Auto-repairs on gateway startup
+- See `tools/repair-session.ts` for standalone CLI
+
+## Case Studies
+
+- [CASE-STUDY-001](docs/CASE-STUDY-001.md) — 7-hour outage from session corruption (Feb 2026)
