@@ -50,16 +50,18 @@ clawos/
 └── examples/           # Integration examples
 ```
 
-## Implementation Roadmap
+## Implementation Status
 
-| Phase | Layer | Timeline | Status |
-|-------|-------|----------|--------|
-| 0 | Session Integrity | Week 0 | ✅ Complete |
-| 1a | Content Tagging | Weeks 1-3 | ✅ Complete |
-| 1b | Capability Control | Weeks 3-6 | ✅ Complete |
-| 2a | Runtime Security | Weeks 7-12 | ✅ Complete |
-| 2b | Signal Detection | Weeks 10-12 | 📋 Planned |
-| 3  | Trust Registry | Weeks 13+ | 📋 Planned |
+| Phase | Layer | Status |
+|-------|-------|--------|
+| 0 | Session Integrity | ✅ Complete + OpenClaw Plugin Deployed |
+| 1a | Content Tagging | ✅ Complete |
+| 1b | Capability Control | ✅ Complete |
+| 2a | Runtime Security | ✅ Complete |
+| 2b | Signal Detection | ✅ Complete (50+ attack patterns) |
+| 3  | Trust Registry | ✅ Complete (hash pinning, signatures, CVE tracking) |
+
+**ALL 6 LAYERS COMPLETE** — Ready for integration testing and open source release.
 
 ## Technical Constraints
 
@@ -76,10 +78,13 @@ Hook point: tool execution pipeline (wraps existing calls, non-invasive).
 ### Real-World Deployment
 
 **Session Integrity Plugin** — Layer 0 is deployed as an OpenClaw plugin:
-- Location: `~/.openclaw/extensions/session-integrity/`
-- Prevents session corruption from content filter blocks
-- Auto-repairs on gateway startup
+- Location: `~/.openclaw/extensions/clawos-l0/`
+- **Startup scan**: Validates ALL sessions immediately on gateway start
+- **Runtime validation**: Validates before each API call
+- Auto-repairs orphaned tool_results
+- Commands: `/l0-status`, `/l0-scan`
 - See `tools/repair-session.ts` for standalone CLI
+- See `docs/CASE-STUDY-001.md` for the incidents that motivated this
 
 ## Case Studies
 
