@@ -1,0 +1,1 @@
+{"extends":"./tsconfig.json","compilerOptions":{"rootDir":".","outDir":"/tmp/clawos-test"},"include":["src/**/*","tests/**/*"]}
