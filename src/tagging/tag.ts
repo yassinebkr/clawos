@@ -5,6 +5,7 @@
  * Designed for <2ms overhead in the hot path.
  */
 
+import { randomUUID } from 'node:crypto';
 import {
   type ContentTag,
   type ContentSource,
@@ -18,12 +19,9 @@ import {
 
 // ─── ID Generation ───────────────────────────────────────────
 
-let counter = 0;
-const prefix = Math.random().toString(36).slice(2, 8);
-
-/** Generate a unique tag ID (fast, no crypto needed — these aren't secrets) */
+/** Generate a cryptographically secure unique tag ID */
 function generateId(): string {
-  return `ct_${prefix}_${(++counter).toString(36)}_${Date.now().toString(36)}`;
+  return `ct_${randomUUID()}`;
 }
 
 // ─── Tag Creation ────────────────────────────────────────────
@@ -331,14 +329,30 @@ export function serializeTag(t: ContentTag): string {
   return JSON.stringify(compact);
 }
 
+/** Valid trust levels for validation */
+const VALID_TRUST_LEVELS = ['system', 'user', 'tool', 'untrusted'];
+
 /**
  * Deserialize a tag from compact wire format.
+ * Validates trust levels to prevent injection of invalid trust.
  */
 export function deserializeTag(serialized: string): ContentTag {
   const c: CompactTag = JSON.parse(serialized);
 
   if (c.ct !== '1.0') {
     throw new Error(`Unsupported tag version: ${c.ct}`);
+  }
+
+  // Validate trust level
+  if (!VALID_TRUST_LEVELS.includes(c.tr)) {
+    throw new Error(`Invalid trust level: ${c.tr}`);
+  }
+
+  // Validate provenance trust levels
+  for (const e of c.pv) {
+    if (!VALID_TRUST_LEVELS.includes(e.tr)) {
+      throw new Error(`Invalid provenance trust level: ${e.tr}`);
+    }
   }
 
   return {
@@ -348,14 +362,14 @@ export function deserializeTag(serialized: string): ContentTag {
       id: c.src.id,
       ...(c.src.l ? { label: c.src.l } : {}),
     },
-    trust: c.tr,
+    trust: c.tr as TrustLevel,
     provenance: c.pv.map((e) => ({
       source: {
         kind: e.src.k,
         id: e.src.id,
         ...(e.src.l ? { label: e.src.l } : {}),
       },
-      trust: e.tr,
+      trust: e.tr as TrustLevel,
       action: e.act,
       timestamp: e.ts,
     })),

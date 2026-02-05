@@ -41,9 +41,9 @@ export function spawn(
 ): SandboxedProcess {
   const runId = randomBytes(8).toString('hex');
 
-  // Ensure temp directory exists
+  // Ensure temp directory exists with restricted permissions
   if (config.tempDir && !existsSync(config.tempDir)) {
-    mkdirSync(config.tempDir, { recursive: true });
+    mkdirSync(config.tempDir, { recursive: true, mode: 0o700 });
   }
 
   const monitor = new BehavioralMonitor(config, undefined, (reason) => {
@@ -63,6 +63,8 @@ export function spawn(
 
   if (config.level === 0) {
     // Level 0: no process spawning, execution is inline
+    // WARNING: Level 0 has NO isolation — skill code runs in main process
+    console.warn(`[ClawOS L3] Level 0 execution for "${context.skillId}" — NO ISOLATION (only use for trusted first-party skills)`);
     handle.status = 'running';
     handle.pid = process.pid;
   } else {

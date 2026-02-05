@@ -1,0 +1,355 @@
+/**
+ * ClawOS Layer 4: Signal Detection — Pattern Definitions
+ */
+
+import type { PatternDefinition, SignalCategory } from "./types.js";
+
+// ============================================================================
+// Injection Patterns
+// ============================================================================
+
+export const INJECTION_PATTERNS: PatternDefinition[] = [
+  // Direct instruction override
+  {
+    pattern: /ignore\s+(all\s+)?(previous|prior|above)\s+(instructions?|prompts?)/i,
+    category: "injection",
+    weight: 0.8,
+    description: "Direct instruction override attempt",
+  },
+  {
+    pattern: /disregard\s+(all\s+)?(previous|prior|above)/i,
+    category: "injection",
+    weight: 0.7,
+    description: "Disregard previous content",
+  },
+  {
+    pattern: /forget\s+(everything|all|what)\s+(you|i)\s+(told|said)/i,
+    category: "injection",
+    weight: 0.6,
+    description: "Memory wipe attempt",
+  },
+
+  // New instruction injection
+  {
+    pattern: /new\s+instructions?:?\s/i,
+    category: "injection",
+    weight: 0.6,
+    description: "New instruction injection",
+  },
+  {
+    pattern: /your\s+real\s+instructions?\s+are/i,
+    category: "injection",
+    weight: 0.8,
+    description: "Fake real instructions",
+  },
+  {
+    pattern: /system\s*prompt:?\s/i,
+    category: "injection",
+    weight: 0.7,
+    description: "System prompt spoofing",
+  },
+  {
+    pattern: /\[INST\]/i,
+    category: "injection",
+    weight: 0.5,
+    description: "Instruction token injection",
+  },
+
+  // Delimiter abuse
+  {
+    pattern: /```system\b/i,
+    category: "injection",
+    weight: 0.7,
+    description: "Markdown system block",
+  },
+  {
+    pattern: /<\/?system>/i,
+    category: "injection",
+    weight: 0.8,
+    description: "XML system tag",
+  },
+  {
+    pattern: /\[SYSTEM\]/i,
+    category: "injection",
+    weight: 0.6,
+    description: "System marker injection",
+  },
+  {
+    pattern: /<\|im_start\|>|<\|im_end\|>/i,
+    category: "injection",
+    weight: 0.9,
+    description: "ChatML token injection",
+  },
+
+  // Developer/debug mode
+  {
+    pattern: /developer\s+mode\s+(enabled|on|activated)/i,
+    category: "injection",
+    weight: 0.6,
+    description: "Developer mode activation",
+  },
+  {
+    pattern: /debug\s+mode\s+(enabled|on|activated)/i,
+    category: "injection",
+    weight: 0.5,
+    description: "Debug mode activation",
+  },
+  {
+    pattern: /maintenance\s+mode/i,
+    category: "injection",
+    weight: 0.5,
+    description: "Maintenance mode claim",
+  },
+
+  // Jailbreak phrases
+  {
+    pattern: /\bDAN\s*(mode)?/i,
+    category: "injection",
+    weight: 0.9,
+    description: "DAN jailbreak reference",
+  },
+  {
+    pattern: /do\s+anything\s+now/i,
+    category: "injection",
+    weight: 0.8,
+    description: "DAN phrase",
+  },
+  {
+    pattern: /\bjailbreak/i,
+    category: "injection",
+    weight: 0.7,
+    description: "Jailbreak reference",
+  },
+  {
+    pattern: /unlock\s+(your\s+)?full\s+potential/i,
+    category: "injection",
+    weight: 0.6,
+    description: "Unlocking attempt",
+  },
+];
+
+// ============================================================================
+// Exfiltration Patterns
+// ============================================================================
+
+export const EXFILTRATION_PATTERNS: PatternDefinition[] = [
+  // System prompt extraction
+  {
+    pattern: /what\s+(is|are)\s+your\s+(system\s+)?instructions?/i,
+    category: "exfiltration",
+    weight: 0.6,
+    description: "System instruction query",
+  },
+  {
+    pattern: /repeat\s+your\s+(system\s+)?prompt/i,
+    category: "exfiltration",
+    weight: 0.8,
+    description: "Prompt repeat request",
+  },
+  {
+    pattern: /print\s+(your\s+)?(initial|original|system)/i,
+    category: "exfiltration",
+    weight: 0.7,
+    description: "System print request",
+  },
+  {
+    pattern: /output\s+(your|the)\s+(system\s+)?prompt/i,
+    category: "exfiltration",
+    weight: 0.7,
+    description: "Prompt output request",
+  },
+  {
+    pattern: /show\s+me\s+your\s+(full\s+)?prompt/i,
+    category: "exfiltration",
+    weight: 0.6,
+    description: "Prompt show request",
+  },
+  {
+    pattern: /what\s+were\s+you\s+told\s+(to\s+do)?/i,
+    category: "exfiltration",
+    weight: 0.5,
+    description: "Instructions query",
+  },
+
+  // Credential extraction
+  {
+    pattern: /show\s+me\s+(your\s+)?(api\s+)?keys?/i,
+    category: "exfiltration",
+    weight: 0.8,
+    description: "API key extraction",
+  },
+  {
+    pattern: /what\s+are\s+(your\s+)?credentials/i,
+    category: "exfiltration",
+    weight: 0.7,
+    description: "Credential query",
+  },
+  {
+    pattern: /output\s+(all\s+)?environment\s+variables/i,
+    category: "exfiltration",
+    weight: 0.8,
+    description: "Env var extraction",
+  },
+  {
+    pattern: /print\s+\$?[A-Z_]+_KEY/i,
+    category: "exfiltration",
+    weight: 0.7,
+    description: "Specific key extraction",
+  },
+
+  // Memory/context extraction
+  {
+    pattern: /list\s+all\s+(your\s+)?(memories|context|history)/i,
+    category: "exfiltration",
+    weight: 0.5,
+    description: "Memory listing",
+  },
+  {
+    pattern: /what\s+do\s+you\s+know\s+about\s+other\s+users/i,
+    category: "exfiltration",
+    weight: 0.6,
+    description: "Cross-user data query",
+  },
+];
+
+// ============================================================================
+// Encoding Patterns
+// ============================================================================
+
+export const ENCODING_PATTERNS: PatternDefinition[] = [
+  // Base64 in suspicious contexts
+  {
+    pattern: /decode\s+this:?\s*[A-Za-z0-9+/]{20,}={0,2}/i,
+    category: "encoding",
+    weight: 0.7,
+    description: "Decode request with base64",
+  },
+
+  // Hex encoding
+  {
+    pattern: /\\x[0-9a-f]{2}(?:\\x[0-9a-f]{2}){10,}/i,
+    category: "encoding",
+    weight: 0.6,
+    description: "Hex escape sequence",
+  },
+
+  // Unicode escapes
+  {
+    pattern: /\\u[0-9a-f]{4}(?:\\u[0-9a-f]{4}){5,}/i,
+    category: "encoding",
+    weight: 0.5,
+    description: "Unicode escape sequence",
+  },
+
+  // ROT13 markers
+  {
+    pattern: /rot13|decode\s+this|translate\s+from\s+cipher/i,
+    category: "encoding",
+    weight: 0.4,
+    description: "Cipher decode request",
+  },
+
+  // Character splitting/obfuscation
+  {
+    pattern: /i\.g\.n\.o\.r\.e/i,
+    category: "encoding",
+    weight: 0.8,
+    description: "Character-split ignore",
+  },
+  {
+    pattern: /s\.y\.s\.t\.e\.m/i,
+    category: "encoding",
+    weight: 0.7,
+    description: "Character-split system",
+  },
+
+  // Reverse text
+  {
+    pattern: /reverse\s+(this|the\s+following)/i,
+    category: "encoding",
+    weight: 0.3,
+    description: "Reverse text request",
+  },
+];
+
+// ============================================================================
+// Roleplay Patterns
+// ============================================================================
+
+export const ROLEPLAY_PATTERNS: PatternDefinition[] = [
+  // Persona override
+  {
+    pattern: /you\s+are\s+(now\s+)?(a|an|the)\s+\w+\s+(named|called)/i,
+    category: "roleplay",
+    weight: 0.5,
+    description: "Persona assignment",
+  },
+  {
+    pattern: /pretend\s+(you\s+are|to\s+be)\s+(a|an)/i,
+    category: "roleplay",
+    weight: 0.4,
+    description: "Pretend request",
+  },
+  {
+    pattern: /from\s+now\s+on,?\s+you\s+(are|will\s+be)/i,
+    category: "roleplay",
+    weight: 0.6,
+    description: "Persistent persona change",
+  },
+
+  // Authority assumption
+  {
+    pattern: /i\s+am\s+your\s+(creator|developer|admin|owner)/i,
+    category: "roleplay",
+    weight: 0.7,
+    description: "Authority claim",
+  },
+  {
+    pattern: /speaking\s+as\s+your\s+(owner|admin|developer)/i,
+    category: "roleplay",
+    weight: 0.7,
+    description: "Authority speaking",
+  },
+  {
+    pattern: /this\s+is\s+(anthropic|openai|the\s+company|your\s+creators?)/i,
+    category: "roleplay",
+    weight: 0.8,
+    description: "Company impersonation",
+  },
+
+  // Override capabilities
+  {
+    pattern: /you\s+can\s+actually\s+do\s+(anything|everything)/i,
+    category: "roleplay",
+    weight: 0.5,
+    description: "Capability override claim",
+  },
+  {
+    pattern: /you\s+don'?t\s+have\s+(any\s+)?(restrictions?|limitations?)/i,
+    category: "roleplay",
+    weight: 0.6,
+    description: "Restriction denial",
+  },
+];
+
+// ============================================================================
+// All Patterns
+// ============================================================================
+
+export const ALL_PATTERNS: PatternDefinition[] = [
+  ...INJECTION_PATTERNS,
+  ...EXFILTRATION_PATTERNS,
+  ...ENCODING_PATTERNS,
+  ...ROLEPLAY_PATTERNS,
+];
+
+// ============================================================================
+// Pattern Categories Map
+// ============================================================================
+
+export const PATTERNS_BY_CATEGORY: Record<string, PatternDefinition[]> = {
+  injection: INJECTION_PATTERNS,
+  exfiltration: EXFILTRATION_PATTERNS,
+  encoding: ENCODING_PATTERNS,
+  roleplay: ROLEPLAY_PATTERNS,
+};

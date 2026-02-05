@@ -40,10 +40,32 @@ unreachable for over 7 hours.
        the previous message.
 ```
 
-**Note**: The second incident proves that:
+### Third Incident (same day, after plugin deployment)
+
+```
+19:50  ClawOS L0 plugin created and enabled in openclaw.json
+21:13  User runs gateway as root by mistake, then restarts as nonbios
+21:16  User sees "Layer 0 loading" message
+21:20  [openclaw] LLM request rejected: messages.190.content.3: unexpected 
+       `tool_use_id` found in `tool_result` blocks: toolu_0199924v9LcWQH222TE8SXBw.
+       Each `tool_result` block must have a corresponding `tool_use` block in 
+       the previous message.
+```
+
+**Critical insight from third incident**:
+1. The plugin's `before_agent_start` hook only fires when processing a message
+2. If session is already corrupted when gateway starts, the first API call fails
+   BEFORE the hook can run
+3. The orphaned tool_use_id came from a session that was corrupted during the
+   root→nonbios user switch, possibly from memory state that never persisted
+4. **FIX**: Plugin must scan and repair ALL sessions immediately at startup,
+   not wait for hook execution
+
+**Notes**:
 1. The problem is systemic, not a one-off
-2. Even with the Layer 0 code written, it's not integrated into OpenClaw
-3. Manual session repair is not a sustainable fix
+2. Hook-based validation is necessary but not sufficient
+3. Startup validation is critical for handling pre-existing corruption
+4. Manual session repair is not a sustainable fix
 
 ## Root Cause Analysis
 
@@ -175,19 +197,63 @@ cat ~/.openclaw/agents/main/sessions/sessions.json | jq -r '."agent:main:main".s
 
 After repair, restart the OpenClaw gateway.
 
-### Long-term: ClawOS Layer 0 Integration
+### Long-term: ClawOS Layer 0 Integration (DEPLOYED)
 
-The full Layer 0 implementation provides:
-- Pre-send validation (catches corruption before API calls)
-- Checkpoint system (rollback on failure)
-- Auto-repair capability
-- Content filter handling
+The OpenClaw plugin (`~/.openclaw/extensions/clawos-l0/`) now provides:
 
-Integration with OpenClaw requires either:
-1. OpenClaw plugin using the `tool_result_persist` hook
-2. Upstream contribution to OpenClaw core
-3. Wrapper script that validates sessions on startup
+1. **Startup scan** (added after third incident):
+   - Scans ALL session files immediately when plugin loads
+   - Repairs any corruption BEFORE first API call
+   - Prevents pre-existing corruption from causing failures
+
+2. **Runtime validation** (`before_agent_start` hook):
+   - Validates tool_use/tool_result pairing before each API call
+   - Catches corruption that might occur during operation
+   - Logs incidents for analysis
+
+3. **Diagnostic commands**:
+   - `/l0-status` - Show current session health
+   - `/l0-scan` - Manually trigger scan and repair
+
+4. **Auto-repair**:
+   - Backs up sessions before modification
+   - Removes orphaned tool_results
+   - Logs all repairs for audit
+
+The plugin architecture ensures defense in depth:
+```
+Gateway Start
+    │
+    ▼
+┌─────────────────────────────┐
+│  STARTUP SCAN (immediate)   │  ◄── Catches pre-existing corruption
+│  Scan all sessions          │
+│  Repair any issues          │
+└─────────────────────────────┘
+    │
+    ▼
+User Message Received
+    │
+    ▼
+┌─────────────────────────────┐
+│  RUNTIME VALIDATION (hook)  │  ◄── Catches runtime corruption
+│  Validate before API call   │
+│  Warn if issues detected    │
+└─────────────────────────────┘
+    │
+    ▼
+API Call Proceeds
+```
 
 ---
 
 *"The best security architecture is useless if the foundation can crack."*
+
+## Plugin Documentation
+
+Created `OPENCLAW-PLUGIN.md` documenting the integration approach:
+- Architecture diagram showing hook points
+- Validation rules and repair strategies
+- Configuration options
+- Performance targets (<50ms overhead)
+- Monitoring events
