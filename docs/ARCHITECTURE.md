@@ -52,12 +52,18 @@ Tool output ──→ [L1 Tag: source=tool:exec, trust=verified]
 
 **Solution:** Validate → Repair → Checkpoint → Rollback.
 
+Also includes **bootstrap file integrity monitoring** — critical files (core validation logic, security manifests) are hash-checked to detect unauthorized modification. Files are classified into three tiers:
+- **Critical** — Must never change; modifications trigger immediate alerts
+- **Sensitive** — Change rarely; modifications are logged and flagged
+- **Monitored** — Tracked for audit; changes recorded silently
+
 ```
 src/integrity/
 ├── types.ts              # Message, Checkpoint, ValidationError types
 ├── validate.ts           # validateToolPairs, validateCompletion, validateStructure
 ├── repair.ts             # removeOrphans, removeIncomplete, removeDuplicates
 ├── checkpoint.ts         # MemoryCheckpointStore, CheckpointManager
+├── bootstrap-integrity.ts # Bootstrap file hash monitoring, tiered protection
 └── session-integrity.ts  # SessionIntegrity controller (ties it all together)
 ```
 
@@ -130,7 +136,9 @@ src/signals/
 └── signal-detection.ts  # scanForSignals, hasInjectionSignals, hasExfiltrationSignals
 ```
 
-**Categories:** `injection`, `exfiltration`, `encoding`, `roleplay`
+**Categories:** `injection`, `exfiltration`, `encoding`, `roleplay`, `self_modification`
+
+Includes **self-modification detection** — patterns that flag when an agent attempts to modify its own source code, plugin files, validation logic, or security configuration. This closes a subtle attack vector where injected instructions convince the agent to weaken its own defenses.
 
 Each signal has a confidence score (0-1). Emitter can filter by confidence threshold and suppress categories.
 

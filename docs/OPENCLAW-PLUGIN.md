@@ -161,6 +161,61 @@ The same plugin architecture can integrate remaining layers:
 - **L4 plugin** — Scan inbound content for injection patterns via `message_received` hook
 - **L5 plugin** — Verify skill integrity on load
 
+## ⚠️ The `gateway_start` Hook Timing Bug
+
+### Discovery
+
+OpenClaw fires the `gateway_start` hook **before** external plugins have registered their hook handlers. The lifecycle is:
+
+1. Gateway loads plugin manifests
+2. Gateway emits `gateway_start` ← **fires here**
+3. Plugins' `register()` is called, which registers hook handlers
+4. Gateway continues startup
+
+This means any external plugin that registers a `gateway_start` handler in `register()` will **never** see that hook fire. The hook has already been emitted by the time the handler is registered. This was confirmed empirically — a breadcrumb file written inside a `gateway_start` handler was never created, not on cold restart and not on soft reload (SIGUSR1).
+
+**This affects ALL external plugins using `gateway_start`, not just ClawOS.**
+
+### Workaround: Lazy Initialization Pattern
+
+Instead of relying on `gateway_start` to initialize state, use **lazy initialization** — check if state has been initialized at the top of every command handler and hook, and self-initialize on first call.
+
+```typescript
+// ❌ Broken: gateway_start never fires for external plugins
+plugin.hook("gateway_start", async () => {
+  await scanAndRepairAllSessions();  // Never executes
+  state.initialized = true;
+});
+
+// ✅ Working: Lazy init in every entry point
+async function ensureInitialized() {
+  if (state.initialized) return;
+  await scanAndRepairAllSessions();
+  state.initialized = true;
+}
+
+plugin.command("/l0-status", async (ctx) => {
+  await ensureInitialized();  // First call triggers init
+  // ... command logic
+});
+
+plugin.command("/l0-scan", async (ctx) => {
+  await ensureInitialized();
+  // ... command logic
+});
+
+plugin.hook("before_agent_start", async (ctx) => {
+  await ensureInitialized();
+  // ... validation logic
+});
+```
+
+The `ensureInitialized()` guard is idempotent — it runs the startup logic exactly once, on whichever entry point is hit first. Subsequent calls are a no-op.
+
+### Current Status
+
+As of v0.3.0, the ClawOS plugin uses lazy initialization exclusively. The `gateway_start` hook registration has been removed.
+
 ## References
 
 - [CASE-STUDY-001.md](./CASE-STUDY-001.md) — 3 incidents that motivated this

@@ -1,5 +1,41 @@
 # Changelog
 
+## v0.3.0 (2026-02-06)
+
+### New Features
+
+**L0: Bootstrap File Integrity Monitor**
+- New `bootstrap-integrity.ts` module monitors critical bootstrap files for unauthorized modifications
+- Tiered protection system with three levels:
+  - **Critical** — Files that must never change (e.g., core validation logic). Modifications trigger immediate alerts.
+  - **Sensitive** — Files that change rarely and only with explicit intent. Changes are logged and flagged.
+  - **Monitored** — Files tracked for audit purposes. Changes are recorded silently.
+- Hash-based change detection with configurable check intervals
+
+**L4: Self-Modification Signal Detection**
+- New detection patterns for agents attempting to modify their own source code or configuration
+- Catches patterns like writing to plugin directories, editing validation logic, overwriting security manifests
+- Advisory-only (consistent with L4 design) — flags but does not block
+
+### Bug Workaround
+
+**OpenClaw `gateway_start` Hook Timing Bug**
+- **Discovery:** OpenClaw fires `gateway_start` BEFORE external plugins register their hook handlers. Any code in a plugin's `gateway_start` handler never executes — not on cold restart, not on soft reload (SIGUSR1). Confirmed by breadcrumb file test (file was never created). **This affects ALL external plugins using `gateway_start`.**
+- **Workaround:** Implemented **lazy initialization pattern** — every command handler and the `before_agent_start` hook now calls `ensureInitialized()` which runs startup logic (session scan/repair) exactly once on first invocation.
+- Removed `gateway_start` hook registration entirely. See [OPENCLAW-PLUGIN.md](./OPENCLAW-PLUGIN.md) for details and code examples.
+
+### Test Coverage
+
+- **Before:** 372 tests, 0 failing, 18 test files
+- **After:** 492 tests, 0 failing, 21 test files
+
+New test files:
+- `tests/integrity/bootstrap-integrity.test.ts` — tiered protection, hash checks, alert triggers
+- `tests/signals/self-modification.test.ts` — self-modification pattern detection
+- `tests/plugin/lazy-init.test.ts` — lazy initialization correctness, idempotency
+
+---
+
 ## v0.1.1 (2026-02-06)
 
 ### Bug Fixes
