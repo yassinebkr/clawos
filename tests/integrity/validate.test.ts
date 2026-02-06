@@ -34,8 +34,10 @@ describe("validateToolPairs", () => {
       userMsg([toolResult("orphan123")]),
     ];
     const errors = validateToolPairs(messages);
-    expect(errors.length).toBe(1);
+    expect(errors.length).toBe(2);
     expect(errors[0].type).toBe("missing_preceding_message");
+    expect(errors[1].type).toBe("orphaned_tool_result");
+    expect(errors[1].toolId).toBe("orphan123");
   });
 
   it("detects orphaned tool_result (ID mismatch)", () => {

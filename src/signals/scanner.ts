@@ -108,7 +108,7 @@ export function detectRepetition(
 ): Signal | null {
   // Split into tokens (rough approximation)
   const words = text.toLowerCase().split(/\s+/).filter(Boolean);
-  if (words.length < 10) return null;
+  if (words.length < 5) return null;
 
   // Count consecutive repeats
   let maxRepeat = 1;

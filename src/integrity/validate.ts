@@ -14,6 +14,21 @@ import type {
   ValidationError,
 } from './types';
 
+// ─── Content Normalization ───────────────────────────────────
+
+/**
+ * Normalize message content to array format.
+ * Handles both string content and array content.
+ */
+function normalizeContent(content: MessageContent[] | string | undefined): MessageContent[] {
+  if (!content) return [];
+  if (typeof content === 'string') {
+    return [{ type: 'text', text: content }];
+  }
+  if (!Array.isArray(content)) return [];
+  return content;
+}
+
 // ─── Content Type Guards ─────────────────────────────────────
 
 export function isToolUse(content: MessageContent): content is ToolUseContent {
@@ -31,7 +46,8 @@ export function isToolResult(content: MessageContent): content is ToolResultCont
  */
 export function getToolUseIds(message: Message): string[] {
   if (message.role !== 'assistant') return [];
-  return message.content.filter(isToolUse).map((c) => c.id);
+  const content = normalizeContent(message.content as MessageContent[] | string);
+  return content.filter(isToolUse).map((c) => c.id);
 }
 
 /**
@@ -39,7 +55,8 @@ export function getToolUseIds(message: Message): string[] {
  */
 export function getToolResultIds(message: Message): string[] {
   if (message.role !== 'user') return [];
-  return message.content.filter(isToolResult).map((c) => c.tool_use_id);
+  const content = normalizeContent(message.content as MessageContent[] | string);
+  return content.filter(isToolResult).map((c) => c.tool_use_id);
 }
 
 // ─── Validation Functions ────────────────────────────────────
@@ -57,26 +74,36 @@ export function validateToolPairs(messages: Message[]): ValidationError[] {
     const msg = messages[i];
     if (msg.role !== 'user') continue;
 
-    const toolResults = msg.content.filter(isToolResult);
+    const content = normalizeContent(msg.content as MessageContent[] | string);
+    const toolResults = content.filter(isToolResult);
     if (toolResults.length === 0) continue;
 
     // Check that previous message exists and is assistant
     const prevMsg = messages[i - 1];
-    if (!prevMsg) {
-      errors.push({
-        type: 'missing_preceding_message',
-        message: `Message ${i} has tool_result(s) but no preceding message`,
-        messageIndex: i,
-      });
-      continue;
-    }
-
-    if (prevMsg.role !== 'assistant') {
-      errors.push({
-        type: 'missing_preceding_message',
-        message: `Message ${i} has tool_result(s) but preceding message is not assistant`,
-        messageIndex: i,
-      });
+    if (!prevMsg || prevMsg.role !== 'assistant') {
+      // No valid preceding assistant message — all tool_results are orphaned
+      if (!prevMsg) {
+        errors.push({
+          type: 'missing_preceding_message',
+          message: `Message ${i} has tool_result(s) but no preceding message`,
+          messageIndex: i,
+        });
+      } else {
+        errors.push({
+          type: 'missing_preceding_message',
+          message: `Message ${i} has tool_result(s) but preceding message is not assistant`,
+          messageIndex: i,
+        });
+      }
+      // Also report each tool_result as orphaned
+      for (const result of toolResults) {
+        errors.push({
+          type: 'orphaned_tool_result',
+          message: `Orphaned tool_result: ${result.tool_use_id} has no matching tool_use`,
+          messageIndex: i,
+          toolId: result.tool_use_id,
+        });
+      }
       continue;
     }
 
@@ -113,7 +140,8 @@ export function validateToolCompletion(messages: Message[]): ValidationError[] {
     const msg = messages[i];
     if (msg.role !== 'assistant') continue;
 
-    const toolUses = msg.content.filter(isToolUse);
+    const content = normalizeContent(msg.content as MessageContent[] | string);
+    const toolUses = content.filter(isToolUse);
     if (toolUses.length === 0) continue;
 
     // If this is the last message, tool_uses are allowed to be pending
@@ -205,8 +233,9 @@ export function validateStructure(messages: Message[]): ValidationError[] {
       continue;
     }
 
-    // Check content exists and is non-empty
-    if (!Array.isArray(msg.content) || msg.content.length === 0) {
+    // Check content exists and is non-empty (handles both string and array)
+    const content = normalizeContent(msg.content as MessageContent[] | string);
+    if (content.length === 0) {
       errors.push({
         type: 'empty_message',
         message: `Empty message at index ${i}`,
@@ -267,7 +296,8 @@ export function isValid(messages: Message[]): boolean {
   // Check structure first (fast)
   for (const msg of messages) {
     if (msg.role !== 'user' && msg.role !== 'assistant') return false;
-    if (!Array.isArray(msg.content) || msg.content.length === 0) return false;
+    const content = normalizeContent(msg.content as MessageContent[] | string);
+    if (content.length === 0) return false;
   }
 
   // Check tool pairs
@@ -275,7 +305,8 @@ export function isValid(messages: Message[]): boolean {
     const msg = messages[i];
     if (msg.role !== 'user') continue;
 
-    const toolResults = msg.content.filter(isToolResult);
+    const content = normalizeContent(msg.content as MessageContent[] | string);
+    const toolResults = content.filter(isToolResult);
     if (toolResults.length === 0) continue;
 
     const prevMsg = messages[i - 1];
@@ -292,7 +323,8 @@ export function isValid(messages: Message[]): boolean {
     const msg = messages[i];
     if (msg.role !== 'assistant') continue;
 
-    const toolUses = msg.content.filter(isToolUse);
+    const content = normalizeContent(msg.content as MessageContent[] | string);
+    const toolUses = content.filter(isToolUse);
     if (toolUses.length === 0) continue;
 
     const nextMsg = messages[i + 1];
@@ -308,10 +340,11 @@ export function isValid(messages: Message[]): boolean {
   const seen = new Set<string>();
   for (const msg of messages) {
     if (msg.role !== 'assistant') continue;
-    for (const content of msg.content) {
-      if (isToolUse(content)) {
-        if (seen.has(content.id)) return false;
-        seen.add(content.id);
+    const content = normalizeContent(msg.content as MessageContent[] | string);
+    for (const c of content) {
+      if (isToolUse(c)) {
+        if (seen.has(c.id)) return false;
+        seen.add(c.id);
       }
     }
   }

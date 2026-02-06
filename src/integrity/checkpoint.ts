@@ -188,6 +188,12 @@ export class CheckpointManager {
    */
   async commit(checkpointId: string): Promise<void> {
     await this.store.commit(checkpointId);
+
+    // Re-prune after commit since prune only considers committed checkpoints
+    const checkpoint = await this.store.get(checkpointId);
+    if (checkpoint) {
+      await this.store.prune(checkpoint.sessionId, this.options.retention);
+    }
   }
 
   /**

@@ -2,8 +2,7 @@
  * Tests for ClawOS Layer 1: Content Tagging
  */
 
-import { describe, it } from 'node:test';
-import assert = require('node:assert');
+import { describe, it, expect } from 'vitest';
 
 import {
   tag,
@@ -39,33 +38,33 @@ describe('tag creation', () => {
     const user = userSource('+33616058433');
     const content = tag('Hello world', user, 'user');
 
-    assert.equal(content.data, 'Hello world');
-    assert.equal(content.tag.trust, 'user');
-    assert.equal(content.tag.source.kind, 'user');
-    assert.equal(content.tag.source.id, '+33616058433');
-    assert.equal(content.tag.provenance.length, 1);
-    assert.equal(content.tag.provenance[0].action, 'created');
-    assert.ok(content.tag.id.startsWith('ct_'));
-    assert.ok(content.tag.timestamp > 0);
+    expect(content.data).toBe('Hello world');
+    expect(content.tag.trust).toBe('user');
+    expect(content.tag.source.kind).toBe('user');
+    expect(content.tag.source.id).toBe('+33616058433');
+    expect(content.tag.provenance.length).toBe(1);
+    expect(content.tag.provenance[0].action).toBe('created');
+    expect(content.tag.id.startsWith('ct_')).toBe(true);
+    expect(content.tag.timestamp).toBeGreaterThan(0);
   });
 
   it('creates unique IDs for each tag', () => {
     const src = userSource('test');
     const t1 = createTag(src, 'user');
     const t2 = createTag(src, 'user');
-    assert.notEqual(t1.id, t2.id);
+    expect(t1.id).not.toBe(t2.id);
   });
 
   it('includes metadata when provided', () => {
     const src = toolSource('web_search');
     const content = tag('result', src, 'tool', { query: 'test' });
-    assert.deepEqual(content.tag.meta, { query: 'test' });
+    expect(content.tag.meta).toEqual({ query: 'test' });
   });
 
   it('omits metadata when not provided', () => {
     const src = toolSource('web_search');
     const content = tag('result', src, 'tool');
-    assert.equal(content.tag.meta, undefined);
+    expect(content.tag.meta).toBeUndefined();
   });
 });
 
@@ -73,41 +72,41 @@ describe('tag creation', () => {
 
 describe('trust resolution', () => {
   it('returns minimum trust from multiple levels', () => {
-    assert.equal(resolveTrust(['user', 'tool']), 'tool');
-    assert.equal(resolveTrust(['system', 'untrusted']), 'untrusted');
-    assert.equal(resolveTrust(['system', 'user', 'tool']), 'tool');
-    assert.equal(resolveTrust(['user', 'user']), 'user');
+    expect(resolveTrust(['user', 'tool'])).toBe('tool');
+    expect(resolveTrust(['system', 'untrusted'])).toBe('untrusted');
+    expect(resolveTrust(['system', 'user', 'tool'])).toBe('tool');
+    expect(resolveTrust(['user', 'user'])).toBe('user');
   });
 
   it('returns untrusted for empty input', () => {
-    assert.equal(resolveTrust([]), 'untrusted');
+    expect(resolveTrust([])).toBe('untrusted');
   });
 
   it('returns the only level for single input', () => {
-    assert.equal(resolveTrust(['system']), 'system');
-    assert.equal(resolveTrust(['untrusted']), 'untrusted');
+    expect(resolveTrust(['system'])).toBe('system');
+    expect(resolveTrust(['untrusted'])).toBe('untrusted');
   });
 });
 
 describe('meetsMinTrust', () => {
   it('system meets all levels', () => {
-    assert.ok(meetsMinTrust('system', 'system'));
-    assert.ok(meetsMinTrust('system', 'user'));
-    assert.ok(meetsMinTrust('system', 'tool'));
-    assert.ok(meetsMinTrust('system', 'untrusted'));
+    expect(meetsMinTrust('system', 'system')).toBe(true);
+    expect(meetsMinTrust('system', 'user')).toBe(true);
+    expect(meetsMinTrust('system', 'tool')).toBe(true);
+    expect(meetsMinTrust('system', 'untrusted')).toBe(true);
   });
 
   it('untrusted only meets untrusted', () => {
-    assert.ok(meetsMinTrust('untrusted', 'untrusted'));
-    assert.ok(!meetsMinTrust('untrusted', 'tool'));
-    assert.ok(!meetsMinTrust('untrusted', 'user'));
-    assert.ok(!meetsMinTrust('untrusted', 'system'));
+    expect(meetsMinTrust('untrusted', 'untrusted')).toBe(true);
+    expect(meetsMinTrust('untrusted', 'tool')).toBe(false);
+    expect(meetsMinTrust('untrusted', 'user')).toBe(false);
+    expect(meetsMinTrust('untrusted', 'system')).toBe(false);
   });
 
   it('works on tagged content', () => {
     const content = tag('data', userSource('test'), 'user');
-    assert.ok(contentMeetsMinTrust(content, 'tool'));
-    assert.ok(!contentMeetsMinTrust(content, 'system'));
+    expect(contentMeetsMinTrust(content, 'tool')).toBe(true);
+    expect(contentMeetsMinTrust(content, 'system')).toBe(false);
   });
 });
 
@@ -121,7 +120,7 @@ describe('trust propagation', () => {
 
     const response = merge([userMsg, toolOut], 'Here is what I found about cats', agent);
 
-    assert.equal(response.tag.trust, 'tool');
+    expect(response.tag.trust).toBe('tool');
   });
 
   it('user message + untrusted web content = untrusted', () => {
@@ -131,7 +130,7 @@ describe('trust propagation', () => {
 
     const response = merge([userMsg, webContent], 'Summary: ...', agent);
 
-    assert.equal(response.tag.trust, 'untrusted');
+    expect(response.tag.trust).toBe('untrusted');
   });
 
   it('system prompt + user message (no tools) = user trust', () => {
@@ -141,16 +140,16 @@ describe('trust propagation', () => {
 
     const response = merge([sysPrompt, userMsg], 'Hi there!', agent);
 
-    assert.equal(response.tag.trust, 'user');
+    expect(response.tag.trust).toBe('user');
   });
 
   it('cached untrusted memory retains untrusted trust', () => {
     const original = tag('data from web', externalSource('api.example.com'), 'untrusted');
     const cached = transform(original, original.data, SYSTEM_OPENCLAW, 'cached');
 
-    assert.equal(cached.tag.trust, 'untrusted');
-    assert.equal(cached.tag.provenance.length, 2);
-    assert.equal(cached.tag.provenance[1].action, 'cached');
+    expect(cached.tag.trust).toBe('untrusted');
+    expect(cached.tag.provenance.length).toBe(2);
+    expect(cached.tag.provenance[1].action).toBe('cached');
   });
 });
 
@@ -165,8 +164,8 @@ describe('merge', () => {
     const merged = merge([a, b], 'AB', agent);
 
     // 2 created entries + 1 merged entry
-    assert.equal(merged.tag.provenance.length, 3);
-    assert.equal(merged.tag.provenance[2].action, 'merged');
+    expect(merged.tag.provenance.length).toBe(3);
+    expect(merged.tag.provenance[2].action).toBe('merged');
   });
 
   it('deduplicates provenance entries', () => {
@@ -175,10 +174,8 @@ describe('merge', () => {
     const b = tag('B', src, 'user');
     const agent = agentSource('main');
 
-    // Same source, same timestamp — but different tag IDs
-    // Provenance entries differ by timestamp so won't dedup unless exact match
     const merged = merge([a, b], 'AB', agent);
-    assert.ok(merged.tag.provenance.length >= 2);
+    expect(merged.tag.provenance.length).toBeGreaterThanOrEqual(2);
   });
 });
 
@@ -187,9 +184,9 @@ describe('transform', () => {
     const original = tag('raw data', toolSource('api'), 'tool');
     const transformed = transform(original, 'processed data', agentSource('main'));
 
-    assert.equal(transformed.tag.trust, 'tool');
-    assert.notEqual(transformed.data, original.data);
-    assert.equal(transformed.data, 'processed data');
+    expect(transformed.tag.trust).toBe('tool');
+    expect(transformed.data).not.toBe(original.data);
+    expect(transformed.data).toBe('processed data');
   });
 
   it('extends provenance chain', () => {
@@ -197,10 +194,10 @@ describe('transform', () => {
     const t1 = transform(original, 'v2', toolSource('processor'));
     const t2 = transform(t1, 'v3', agentSource('main'));
 
-    assert.equal(t2.tag.provenance.length, 3);
-    assert.equal(t2.tag.provenance[0].action, 'created');
-    assert.equal(t2.tag.provenance[1].action, 'transformed');
-    assert.equal(t2.tag.provenance[2].action, 'transformed');
+    expect(t2.tag.provenance.length).toBe(3);
+    expect(t2.tag.provenance[0].action).toBe('created');
+    expect(t2.tag.provenance[1].action).toBe('transformed');
+    expect(t2.tag.provenance[2].action).toBe('transformed');
   });
 });
 
@@ -209,10 +206,10 @@ describe('forward', () => {
     const original = tag('secret', userSource('u1'), 'user');
     const forwarded = forward(original, agentSource('relay'));
 
-    assert.equal(forwarded.data, 'secret');
-    assert.equal(forwarded.tag.trust, 'user');
-    assert.equal(forwarded.tag.provenance.length, 2);
-    assert.equal(forwarded.tag.provenance[1].action, 'forwarded');
+    expect(forwarded.data).toBe('secret');
+    expect(forwarded.tag.trust).toBe('user');
+    expect(forwarded.tag.provenance.length).toBe(2);
+    expect(forwarded.tag.provenance[1].action).toBe('forwarded');
   });
 });
 
@@ -221,15 +218,15 @@ describe('downgrade', () => {
     const content = tag('data', userSource('u1'), 'user');
     const downgraded = downgrade(content, 'untrusted', 'entered MCP boundary');
 
-    assert.equal(downgraded.tag.trust, 'untrusted');
-    assert.equal(downgraded.tag.meta?.downgradeReason, 'entered MCP boundary');
+    expect(downgraded.tag.trust).toBe('untrusted');
+    expect(downgraded.tag.meta?.downgradeReason).toBe('entered MCP boundary');
   });
 
   it('cannot upgrade trust level', () => {
     const content = tag('data', externalSource('web'), 'untrusted');
     const attempted = downgrade(content, 'system', 'nice try');
 
-    assert.equal(attempted.tag.trust, 'untrusted'); // Unchanged
+    expect(attempted.tag.trust).toBe('untrusted');
   });
 });
 
@@ -240,18 +237,18 @@ describe('provenance inspection', () => {
     const content = tag('data', userSource('+33xxx', 'Alice'), 'user');
     const trace = traceProvenance(content);
 
-    assert.ok(trace.includes('Alice'));
-    assert.ok(trace.includes('created'));
-    assert.ok(trace.includes('trust=user'));
+    expect(trace).toContain('Alice');
+    expect(trace).toContain('created');
+    expect(trace).toContain('trust=user');
   });
 
   it('detects untrusted origins', () => {
     const safe = tag('safe', userSource('u1'), 'user');
-    assert.ok(!hasUntrustedOrigin(safe));
+    expect(hasUntrustedOrigin(safe)).toBe(false);
 
     const unsafe = tag('unsafe', externalSource('evil'), 'untrusted');
     const merged = merge([safe, unsafe], 'combined', agentSource('main'));
-    assert.ok(hasUntrustedOrigin(merged));
+    expect(hasUntrustedOrigin(merged)).toBe(true);
   });
 
   it('lists unique sources', () => {
@@ -261,9 +258,9 @@ describe('provenance inspection', () => {
 
     const sources = getSources(merged);
     const ids = sources.map((s) => s.id);
-    assert.ok(ids.includes('u1'));
-    assert.ok(ids.includes('t1'));
-    assert.ok(ids.includes('main'));
+    expect(ids).toContain('u1');
+    expect(ids).toContain('t1');
+    expect(ids).toContain('main');
   });
 });
 
@@ -280,14 +277,14 @@ describe('serialization', () => {
     const serialized = serializeTag(original);
     const deserialized = deserializeTag(serialized);
 
-    assert.equal(deserialized.id, original.id);
-    assert.equal(deserialized.trust, original.trust);
-    assert.equal(deserialized.source.id, original.source.id);
-    assert.equal(deserialized.source.kind, original.source.kind);
-    assert.equal(deserialized.source.label, original.source.label);
-    assert.equal(deserialized.provenance.length, original.provenance.length);
-    assert.equal(deserialized.timestamp, original.timestamp);
-    assert.deepEqual(deserialized.meta, original.meta);
+    expect(deserialized.id).toBe(original.id);
+    expect(deserialized.trust).toBe(original.trust);
+    expect(deserialized.source.id).toBe(original.source.id);
+    expect(deserialized.source.kind).toBe(original.source.kind);
+    expect(deserialized.source.label).toBe(original.source.label);
+    expect(deserialized.provenance.length).toBe(original.provenance.length);
+    expect(deserialized.timestamp).toBe(original.timestamp);
+    expect(deserialized.meta).toEqual(original.meta);
   });
 
   it('compact format uses short keys', () => {
@@ -295,20 +292,19 @@ describe('serialization', () => {
     const json = serializeTag(t);
     const parsed = JSON.parse(json);
 
-    assert.equal(parsed.ct, '1.0');
-    assert.ok('src' in parsed);
-    assert.ok('tr' in parsed);
-    assert.ok('pv' in parsed);
-    // Should NOT have full keys
-    assert.ok(!('source' in parsed));
-    assert.ok(!('trust' in parsed));
-    assert.ok(!('provenance' in parsed));
+    expect(parsed.ct).toBe('1.0');
+    expect(parsed).toHaveProperty('src');
+    expect(parsed).toHaveProperty('tr');
+    expect(parsed).toHaveProperty('pv');
+    expect(parsed).not.toHaveProperty('source');
+    expect(parsed).not.toHaveProperty('trust');
+    expect(parsed).not.toHaveProperty('provenance');
   });
 
   it('rejects unknown version', () => {
-    assert.throws(() => {
+    expect(() => {
       deserializeTag('{"ct":"2.0","id":"x","src":{"k":"user","id":"x"},"tr":"user","pv":[],"ts":0}');
-    }, /Unsupported tag version/);
+    }).toThrow(/Unsupported tag version/);
   });
 });
 
@@ -316,22 +312,22 @@ describe('serialization', () => {
 
 describe('source factories', () => {
   it('creates correct source kinds', () => {
-    assert.equal(userSource('u1').kind, 'user');
-    assert.equal(toolSource('t1').kind, 'tool');
-    assert.equal(skillSource('weather').kind, 'tool');
-    assert.equal(skillSource('weather').id, 'skill:weather');
-    assert.equal(agentSource('main').kind, 'agent');
-    assert.equal(externalSource('api.com').kind, 'external');
-    assert.equal(mcpSource('server1').kind, 'external');
-    assert.equal(mcpSource('server1').id, 'mcp:server1');
+    expect(userSource('u1').kind).toBe('user');
+    expect(toolSource('t1').kind).toBe('tool');
+    expect(skillSource('weather').kind).toBe('tool');
+    expect(skillSource('weather').id).toBe('skill:weather');
+    expect(agentSource('main').kind).toBe('agent');
+    expect(externalSource('api.com').kind).toBe('external');
+    expect(mcpSource('server1').kind).toBe('external');
+    expect(mcpSource('server1').id).toBe('mcp:server1');
   });
 
   it('maps default trust correctly', () => {
-    assert.equal(defaultTrustFor(SYSTEM_OPENCLAW), 'system');
-    assert.equal(defaultTrustFor(userSource('u1')), 'user');
-    assert.equal(defaultTrustFor(toolSource('t1')), 'tool');
-    assert.equal(defaultTrustFor(agentSource('a1')), 'tool');
-    assert.equal(defaultTrustFor(externalSource('web')), 'untrusted');
+    expect(defaultTrustFor(SYSTEM_OPENCLAW)).toBe('system');
+    expect(defaultTrustFor(userSource('u1'))).toBe('user');
+    expect(defaultTrustFor(toolSource('t1'))).toBe('tool');
+    expect(defaultTrustFor(agentSource('a1'))).toBe('tool');
+    expect(defaultTrustFor(externalSource('web'))).toBe('untrusted');
   });
 });
 
@@ -339,18 +335,18 @@ describe('source factories', () => {
 
 describe('edge cases', () => {
   it('handles empty provenance in resolveTrust', () => {
-    assert.equal(resolveTrust([]), 'untrusted');
+    expect(resolveTrust([])).toBe('untrusted');
   });
 
   it('tag works with non-string data', () => {
     const content = tag({ key: 'value' }, toolSource('api'), 'tool');
-    assert.deepEqual(content.data, { key: 'value' });
-    assert.equal(content.tag.trust, 'tool');
+    expect(content.data).toEqual({ key: 'value' });
+    expect(content.tag.trust).toBe('tool');
   });
 
   it('trust rank ordering is correct', () => {
-    assert.ok(TRUST_RANK.system > TRUST_RANK.user);
-    assert.ok(TRUST_RANK.user > TRUST_RANK.tool);
-    assert.ok(TRUST_RANK.tool > TRUST_RANK.untrusted);
+    expect(TRUST_RANK.system).toBeGreaterThan(TRUST_RANK.user);
+    expect(TRUST_RANK.user).toBeGreaterThan(TRUST_RANK.tool);
+    expect(TRUST_RANK.tool).toBeGreaterThan(TRUST_RANK.untrusted);
   });
 });

@@ -57,6 +57,12 @@ export const INJECTION_PATTERNS: PatternDefinition[] = [
 
   // Delimiter abuse
   {
+    pattern: /^\s*SYSTEM\s*:/im,
+    category: "injection",
+    weight: 0.7,
+    description: "System label injection",
+  },
+  {
     pattern: /```system\b/i,
     category: "injection",
     weight: 0.7,
@@ -195,6 +201,32 @@ export const EXFILTRATION_PATTERNS: PatternDefinition[] = [
     category: "exfiltration",
     weight: 0.7,
     description: "Specific key extraction",
+  },
+
+  // Data exfiltration via URLs / network
+  {
+    pattern: /(?:fetch|curl|wget|http\.get|requests?\.(?:get|post))\s*\(?.*(?:evil|attacker|webhook|steal)/i,
+    category: "exfiltration",
+    weight: 0.9,
+    description: "Data exfiltration via HTTP request",
+  },
+  {
+    pattern: /send\s+(?:this\s+)?to\s+https?:\/\//i,
+    category: "exfiltration",
+    weight: 0.7,
+    description: "Data send to external URL",
+  },
+  {
+    pattern: /curl\s+https?:\/\/.*\|\s*(?:bash|sh|zsh)/i,
+    category: "exfiltration",
+    weight: 0.9,
+    description: "Pipe from URL to shell",
+  },
+  {
+    pattern: /(?:send|post|upload|exfil)\s+.*(?:to|via)\s+(?:webhook|external|remote)/i,
+    category: "exfiltration",
+    weight: 0.7,
+    description: "Data exfiltration to external service",
   },
 
   // Memory/context extraction

@@ -21,3 +21,6 @@ export * from './signals/index.js';
 
 // Layer 5: Trust Registry
 export * from './registry/index.js';
+
+// Integration Pipeline
+export * from './pipeline.js';
