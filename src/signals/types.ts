@@ -16,6 +16,7 @@ export type SignalCategory =
   | "override" // System prompt override attempts
   | "repetition" // Unusual repetition (token stuffing)
   | "boundary" // Trust boundary violations
+  | "self_modification" // Attempts to modify agent's own config/prompt files
   | "anomaly"; // Statistical anomalies
 
 // ============================================================================

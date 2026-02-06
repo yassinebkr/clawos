@@ -18,6 +18,7 @@ import {
   EXFILTRATION_PATTERNS,
   ENCODING_PATTERNS,
   ROLEPLAY_PATTERNS,
+  SELF_MODIFICATION_PATTERNS,
 } from "./patterns.js";
 
 // ============================================================================
@@ -214,6 +215,7 @@ export class SignalScanner implements Scanner {
     "exfiltration",
     "encoding",
     "roleplay",
+    "self_modification",
     "repetition",
   ];
 
@@ -236,6 +238,8 @@ export class SignalScanner implements Scanner {
     if (config?.patterns?.roleplay !== false) {
       patterns.push(...ROLEPLAY_PATTERNS);
     }
+    // Self-modification patterns are always loaded (security-critical)
+    patterns.push(...SELF_MODIFICATION_PATTERNS);
     if (config?.patterns?.custom) {
       patterns.push(...config.patterns.custom);
     }

@@ -365,6 +365,84 @@ export const ROLEPLAY_PATTERNS: PatternDefinition[] = [
 ];
 
 // ============================================================================
+// Self-Modification Patterns
+// ============================================================================
+
+export const SELF_MODIFICATION_PATTERNS: PatternDefinition[] = [
+  // Modify SOUL file
+  {
+    pattern: /(?:edit|modify|rewrite|change|update)\s+your\s+(?:.*\s+)?SOUL/i,
+    category: "self_modification",
+    weight: 0.8,
+    description: "Attempt to modify agent SOUL file",
+    contextCheck: (text: string, _match: RegExpExecArray): boolean => {
+      // Exclude "help me write/edit a SOUL.md" (user asking for help with their own file)
+      if (/help\s+me\s+(?:write|edit|create|make)/i.test(text)) return false;
+      return true;
+    },
+  },
+
+  // Modify AGENTS file
+  {
+    pattern: /(?:edit|modify|rewrite|change|update)\s+your\s+(?:.*\s+)?AGENTS/i,
+    category: "self_modification",
+    weight: 0.8,
+    description: "Attempt to modify agent AGENTS file",
+    contextCheck: (text: string, _match: RegExpExecArray): boolean => {
+      if (/help\s+me\s+(?:write|edit|create|make)/i.test(text)) return false;
+      return true;
+    },
+  },
+
+  // Modify system prompt / instructions / rules / personality / behavior
+  {
+    pattern: /(?:change|modify|rewrite|edit)\s+your\s+(?:system\s+prompt|instructions|rules|personality|behavior)/i,
+    category: "self_modification",
+    weight: 0.85,
+    description: "Attempt to modify agent system prompt or core instructions",
+  },
+
+  // Write to / overwrite SOUL.md / AGENTS.md / USER.md
+  {
+    pattern: /(?:write\s+to|overwrite)\s+(?:your\s+)?(?:SOUL\.md|AGENTS\.md|USER\.md)/i,
+    category: "self_modification",
+    weight: 0.85,
+    description: "Attempt to write to agent config files",
+    contextCheck: (text: string, _match: RegExpExecArray): boolean => {
+      // Exclude "help me write a SOUL.md" or similar
+      if (/help\s+me/i.test(text)) return false;
+      // Exclude "I wrote to SOUL.md" (past tense, user did it)
+      if (/\bI\s+(?:wrote|updated|changed)\b/i.test(text)) return false;
+      return true;
+    },
+  },
+
+  // Remove restrictions / rules / safety / guidelines from config/files/prompt
+  {
+    pattern: /(?:remove|disable|delete)\s+(?:all\s+)?(?:restrictions?|rules?|safety|guidelines?)\s+from\s+your\s+(?:config|files?|prompt|system)/i,
+    category: "self_modification",
+    weight: 0.9,
+    description: "Attempt to remove restrictions from agent configuration",
+  },
+
+  // "you are (now) free to change/modify/rewrite yourself/your rules/prompt/soul"
+  {
+    pattern: /you\s+are\s+(?:now\s+)?free\s+to\s+(?:change|modify|rewrite)\s+(?:yourself|your\s+(?:rules|prompt|soul))/i,
+    category: "self_modification",
+    weight: 0.8,
+    description: "Claim that agent is free to self-modify",
+  },
+
+  // "make this/these change(s) permanent/persistent" in context of instructions
+  {
+    pattern: /make\s+(?:this|these)\s+changes?\s+(?:to\s+your\s+(?:instructions?|prompt|rules?|config)\s+)?(?:permanent|persistent)/i,
+    category: "self_modification",
+    weight: 0.7,
+    description: "Attempt to make instruction changes persistent",
+  },
+];
+
+// ============================================================================
 // All Patterns
 // ============================================================================
 
@@ -373,6 +451,7 @@ export const ALL_PATTERNS: PatternDefinition[] = [
   ...EXFILTRATION_PATTERNS,
   ...ENCODING_PATTERNS,
   ...ROLEPLAY_PATTERNS,
+  ...SELF_MODIFICATION_PATTERNS,
 ];
 
 // ============================================================================
@@ -384,4 +463,5 @@ export const PATTERNS_BY_CATEGORY: Record<string, PatternDefinition[]> = {
   exfiltration: EXFILTRATION_PATTERNS,
   encoding: ENCODING_PATTERNS,
   roleplay: ROLEPLAY_PATTERNS,
+  self_modification: SELF_MODIFICATION_PATTERNS,
 };
