@@ -76,13 +76,14 @@ Tool output ──→ [L4+: Scan external content for injection]
                     │
                     ▼
               ┌──────────────┐
-              │ 🐤 Canary   │ ──→ Token leaked? Exfiltration confirmed
+              │   Canary     │ ──→ Token leaked? Exfiltration confirmed
               │   Check      │
               └──────────────┘
                     │
                     ▼
               ┌──────────────┐
-              │ L0: Validate │ ──→ Session intact? Auto-repair if broken
+              │ L0: Validate │ ──→ Session intact? Auto-repair    
+                                          if broken
               │   Session    │
               └──────────────┘
                     │
