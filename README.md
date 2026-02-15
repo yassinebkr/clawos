@@ -29,27 +29,17 @@ Traditional content filters can't solve this. They pattern-match on known attack
 
 ClawOS implements defense-in-depth with 9 independent layers. Each layer operates autonomously — if one fails, the others still protect.
 
-```
-+------------------------------+-------------------------------+
-|  Canary Token                |  Exfiltration tripwire        |
-+------------------------------+-------------------------------+
-|  LC   Privilege Separation   |  Block dangerous tools        |
-+------------------------------+-------------------------------+
-|  L5   Trust Registry         |  Hash pinning, signatures     |
-+------------------------------+-------------------------------+
-|  L4+  External Scanner       |  Indirect injection detection |
-+------------------------------+-------------------------------+
-|  L4   Signal Detection       |  50+ attack patterns          |
-+------------------------------+-------------------------------+
-|  L3   Runtime Security       |  Process isolation            |
-+------------------------------+-------------------------------+
-|  L2   Capability Control     |  Skill manifests, permissions |
-+------------------------------+-------------------------------+
-|  L1   Content Tagging        |  Source tracking, trust       |
-+------------------------------+-------------------------------+
-|  L0   Session Integrity      |  State validation, repair     |
-+------------------------------+-------------------------------+
-```
+| Layer | Name | Function |
+|:------|:-----|:---------|
+| Canary | Token Tripwire | Exfiltration detection via embedded token |
+| **LC** | Privilege Separation | Block dangerous tools during active threats |
+| **L5** | Trust Registry | Hash pinning, signature verification |
+| **L4+** | External Content Scanner | Indirect prompt injection detection |
+| **L4** | Signal Detection | 50+ attack patterns, advisory-only |
+| **L3** | Runtime Security | Process isolation, behavioral monitoring |
+| **L2** | Capability Control | Skill manifests, least-privilege permissions |
+| **L1** | Content Tagging | Source tracking, trust level provenance |
+| **L0** | Session Integrity | State validation, auto-repair, checkpoints |
 
 ### Data Flow
 
