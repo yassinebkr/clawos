@@ -259,7 +259,9 @@ ClawOS ships as a production plugin for [OpenClaw](https://github.com/openclaw/o
 | `message_received` | L4, LC | Scan inbound messages, clear threat state |
 | `before_agent_start` | L0, L1, L4, 🐤 | Validate session, tag context, inject canary |
 | `tool_result_persist` | L1, L4+, 🐤 | Tag results, scan external content, check canary |
-| `before_tool_call` | LC | Block dangerous tools during active threats |
+| `before_tool_call` ⚡ | LC | Block dangerous tools during active threats |
+
+> **⚡ Fork required:** The `before_tool_call` hook (used by Layer C) is not yet available in upstream OpenClaw. It's implemented in [our fork](https://github.com/yassinebkr/openclaw) and submitted as PRs [#10678](https://github.com/openclaw/openclaw/pull/10678), [#10679](https://github.com/openclaw/openclaw/pull/10679), and [#10680](https://github.com/openclaw/openclaw/pull/10680) (all CI green, pending maintainer review). The `gateway_start` lifecycle hook also depends on PR #10679. All other hooks work with upstream OpenClaw.
 
 ### Plugin Commands
 
