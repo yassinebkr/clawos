@@ -91,13 +91,38 @@ ClawOS monitors writes to critical workspace files:
 
 ## Installation
 
-1. Copy the `clawos/` directory to `~/.openclaw/extensions/clawos/`
-2. Enable in your OpenClaw config:
+### Option 1: OpenClaw CLI (recommended)
 
-```yaml
-plugins:
-  clawos:
-    enabled: true
+```bash
+openclaw plugins install github:yassinebkr/clawos
+```
+
+This downloads the plugin, places it in `~/.openclaw/extensions/clawos/`, and registers it in your config. Then restart:
+
+```bash
+openclaw gateway restart
+```
+
+### Option 2: Manual
+
+1. Clone or copy into `~/.openclaw/extensions/clawos/`:
+
+```bash
+git clone https://github.com/yassinebkr/clawos.git ~/.openclaw/extensions/clawos
+```
+
+2. Enable in your OpenClaw config (`~/.openclaw/openclaw.json`):
+
+```json
+{
+  "plugins": {
+    "entries": {
+      "clawos": {
+        "enabled": true
+      }
+    }
+  }
+}
 ```
 
 3. Restart the gateway:
