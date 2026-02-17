@@ -2,13 +2,13 @@
   <img src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript">
   <img src="https://img.shields.io/badge/Tests-492%20passing-brightgreen?style=for-the-badge" alt="Tests">
   <img src="https://img.shields.io/badge/License-Apache%202.0-blue?style=for-the-badge" alt="License">
-  <img src="https://img.shields.io/badge/Layers-9-orange?style=for-the-badge" alt="Layers">
+  <img src="https://img.shields.io/badge/Layers-10-orange?style=for-the-badge" alt="Layers">
 </p>
 
 <h1 align="center">🛡️ ClawOS</h1>
 <p align="center"><strong>Security Architecture for Autonomous AI Agents</strong></p>
 <p align="center">
-  9-layer defense system that protects AI agents from prompt injection, data exfiltration, session corruption, and unauthorized actions. Built for <a href="https://github.com/openclaw/openclaw">OpenClaw</a>, usable standalone.
+  10-layer defense system that protects AI agents from prompt injection, data exfiltration, session corruption, and unauthorized actions. Built for <a href="https://github.com/openclaw/openclaw">OpenClaw</a>, usable standalone.
 </p>
 
 ---
@@ -31,17 +31,18 @@ Traditional content filters can't solve this. They pattern-match on known attack
 
 ClawOS implements defense-in-depth with 9 independent layers. Each layer operates autonomously — if one fails, the others still protect.
 
-| Layer | Name | Function |
-|:------|:-----|:---------|
-| Canary | Token Tripwire | Exfiltration detection via embedded token |
-| **LC** | Privilege Separation | Block dangerous tools during active threats |
-| **L5** | Trust Registry | Hash pinning, signature verification |
-| **L4+** | External Content Scanner | Indirect prompt injection detection |
-| **L4** | Signal Detection | 50+ attack patterns, advisory-only |
-| **L3** | Runtime Security | Process isolation, behavioral monitoring |
-| **L2** | Capability Control | Skill manifests, least-privilege permissions |
-| **L1** | Content Tagging | Source tracking, trust level provenance |
-| **L0** | Session Integrity | State validation, auto-repair, checkpoints |
+| Layer | Name | Function | Status |
+|:------|:-----|:---------|:-------|
+| Canary | Token Tripwire | Exfiltration detection via embedded token | ✅ Active |
+| **LF** | File Write Guard | Block agent writes to critical files (SOUL.md, AGENTS.md, openclaw.json) | ✅ Tested |
+| **LC** | Privilege Separation | Block dangerous tools during active threats | ✅ Active |
+| **L5** | Trust Registry | Hash pinning, signature verification | ✅ Active |
+| **L4+** | External Content Scanner | Indirect prompt injection detection | ✅ Active |
+| **L4** | Signal Detection | 50+ attack patterns, advisory-only | ✅ Active |
+| **L3** | Runtime Security | Process isolation, behavioral monitoring | Advisory |
+| **L2** | Capability Control | Skill manifests, least-privilege permissions | Advisory |
+| **L1** | Content Tagging | Source tracking, trust level provenance | ✅ Active |
+| **L0** | Session Integrity | State validation, auto-repair, checkpoints | ✅ Active |
 
 ### Data Flow
 
@@ -204,6 +205,34 @@ Specialized scanner for tool results from web-facing sources (`web_fetch`, `web_
 - Data exfiltration via response manipulation
 - Instruction density heuristics
 
+### LF: File Write Guard — *Critical File Protection*
+
+LF unconditionally blocks agent tools (`write`, `edit`, `exec`) from modifying critical files. This protects the agent's identity and configuration from self-modification attacks — even if injection bypasses all other layers.
+
+**Protected files (by tier):**
+
+| Tier | Files | Action |
+|------|-------|--------|
+| Critical | `SOUL.md`, `AGENTS.md`, `openclaw.json` | **Blocked** — agent tools cannot modify |
+| Sensitive | `USER.md`, `IDENTITY.md`, `BOOTSTRAP.md` | Logged + alerted |
+| Monitored | `HEARTBEAT.md`, `TOOLS.md` | Tracked |
+
+```
+🔒 [ClawOS LF] BLOCKED write → SOUL.md (critical).
+   This file can only be modified by the gateway or plugin, not by agent tools.
+
+🔒 [ClawOS LF] BLOCKED exec targeting critical file "SOUL.md".
+   This file can only be modified by the gateway or plugin.
+```
+
+The gateway and plugins write via `fs` directly, bypassing the hook — so the human can still edit these files through the gateway config or manually.
+
+**Tested and confirmed working** (Feb 17, 2026):
+- `write` to SOUL.md → ✅ Blocked
+- `edit` to AGENTS.md → ✅ Blocked
+- `exec echo > SOUL.md` → ✅ Blocked
+- Normal file writes → ✅ Pass through
+
 ### LC: Privilege Separation — *Enforcement*
 
 When L4+ detects high-severity injection signals in external content, LC immediately restricts dangerous tools for the current turn:
@@ -252,7 +281,7 @@ ClawOS ships as a production plugin for [OpenClaw](https://github.com/openclaw/o
 | `message_received` | L4, LC | Scan inbound messages, clear threat state |
 | `before_agent_start` | L0, L1, L4, 🐤 | Validate session, tag context, inject canary |
 | `tool_result_persist` | L1, L4+, 🐤 | Tag results, scan external content, check canary |
-| `before_tool_call` ⚡ | LC | Block dangerous tools during active threats |
+| `before_tool_call` ⚡ | LF, LC | Block critical file writes + dangerous tools during threats |
 
 ### Plugin Commands
 
@@ -262,6 +291,16 @@ ClawOS ships as a production plugin for [OpenClaw](https://github.com/openclaw/o
 | `/clawos-scan` | Manual L0 session integrity scan |
 | `/clawos-signals` | Recent signal detection history |
 | `/clawos-integrity` | Bootstrap file integrity report |
+
+## Known Issues
+
+### SIGUSR1 hot-reload does not activate `before_tool_call` hooks
+
+OpenClaw wraps tools with hook interceptors once at process init (`wrapToolWithHooks`). If `hasHooks("before_tool_call")` returns `false` at that point (because plugins hadn't registered yet), the tools get the unwrapped `execute()`. A later SIGUSR1 hot-reload registers the hooks in the plugin registry, but doesn't re-wrap the already-initialized tools.
+
+**Workaround:** Always do a full process kill + restart (not SIGUSR1) when deploying changes to `before_tool_call` hooks (LF, LC).
+
+**Impact:** LF and LC are completely inactive until the gateway is fully restarted. This is a gap in OpenClaw's hot-reload lifecycle.
 
 ## Security Lessons
 
