@@ -1,0 +1,55 @@
+{
+  "id": "clawos",
+  "name": "ClawOS — Security Stack",
+  "version": "0.5.0",
+  "description": "Defense-in-depth security for OpenClaw agents: session integrity, content tagging, signal detection, external content scanning, privilege separation, canary tokens, and bootstrap file protection.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "layers": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "integrity": { "type": "boolean", "default": true },
+          "tagging": { "type": "boolean", "default": true },
+          "signals": { "type": "boolean", "default": true },
+          "capabilities": { "type": "boolean", "default": false },
+          "runtime": { "type": "boolean", "default": false },
+          "registry": { "type": "boolean", "default": false },
+          "privilegeSeparation": { "type": "boolean", "default": true }
+        }
+      },
+      "signals": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "minConfidence": { "type": "number", "default": 0.5, "minimum": 0, "maximum": 1 },
+          "suppressCategories": {
+            "type": "array",
+            "items": { "type": "string", "enum": ["injection", "exfiltration", "encoding", "roleplay"] },
+            "default": []
+          },
+          "alertOnHighSeverity": { "type": "boolean", "default": true }
+        }
+      },
+      "logLevel": {
+        "type": "string",
+        "enum": ["debug", "info", "warn", "error"],
+        "default": "info"
+      }
+    }
+  },
+  "uiHints": {
+    "layers.integrity": { "label": "L0: Session Integrity" },
+    "layers.tagging": { "label": "L1: Content Tagging" },
+    "layers.signals": { "label": "L4: Signal Detection" },
+    "layers.capabilities": { "label": "L2: Capability Control (advisory)" },
+    "layers.runtime": { "label": "L3: Runtime Security (advisory)" },
+    "layers.registry": { "label": "L5: Trust Registry (advisory)" },
+    "layers.privilegeSeparation": { "label": "LC: Privilege Separation (blocks dangerous tools on injection)" },
+    "signals.minConfidence": { "label": "Minimum signal confidence", "placeholder": "0.5" },
+    "signals.suppressCategories": { "label": "Categories to suppress" },
+    "signals.alertOnHighSeverity": { "label": "Log high-severity signals" }
+  }
+}
