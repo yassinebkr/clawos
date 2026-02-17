@@ -21,25 +21,39 @@ ClawOS adds 9 defense layers that detect, tag, and **block** these attacks at th
 
 ```
 ┌─────────────────────────────────────────────────────────┐
+│                  Gateway Start                          │
+├─────────────────────────────────────────────────────────┤
+│  L0  Startup Scan ──────── Validate all session JSONLs  │  ← gateway_start
+│  L5  Bootstrap Integrity ─ Snapshot protected file hashes│
+├─────────────────────────────────────────────────────────┤
 │                    User Message                         │
 ├─────────────────────────────────────────────────────────┤
-│  L4  Signal Detection ──── Scan inbound for injection   │
-│  L1  Content Tagging ───── Tag trust level & source     │
+│  L4  Signal Detection ──── Scan inbound for injection   │  ← message_received
+│  LC  Threat Clear ──────── Reset restriction on user msg│
 ├─────────────────────────────────────────────────────────┤
-│                    Agent Thinks                         │
+│                  Before Agent Turn                      │
 ├─────────────────────────────────────────────────────────┤
-│  L0  Session Integrity ─── Validate session before turn │
-│  🐤  Canary Token ──────── Injected into context        │
+│  L0  Session Integrity ─── Repair corrupted messages    │  ← before_agent_start
+│  L0  Disk Persistence ──── Write repairs back to JSONL  │
+│  L1  Context Tagging ───── Tag trust level & source     │
+│  🐤  Canary Token ──────── Inject secret into context   │
 ├─────────────────────────────────────────────────────────┤
 │                    Agent Calls Tool                     │
 ├─────────────────────────────────────────────────────────┤
 │  LC  Privilege Separation ─ BLOCK if threat detected    │  ← before_tool_call
+│  LF  File Write Guard ──── BLOCK writes to critical files│  ← before_tool_call
 ├─────────────────────────────────────────────────────────┤
 │                    Tool Returns Result                  │
 ├─────────────────────────────────────────────────────────┤
 │  L4+ External Scanner ──── Scan result for injection    │  ← tool_result_persist
 │  🐤  Canary Check ──────── Detect system prompt leak    │
 │  L1  Provenance Tag ────── Tag source & trust metadata  │
+├─────────────────────────────────────────────────────────┤
+│              Advisory (code ready, hooks pending)        │
+├─────────────────────────────────────────────────────────┤
+│  L2  Capability Control ── Manifest-based permissions   │
+│  L3  Runtime Security ──── Behavioral anomaly detection │
+│  L5  Trust Registry ────── Cryptographic hash pinning   │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -54,6 +68,7 @@ ClawOS adds 9 defense layers that detect, tag, and **block** these attacks at th
 | **L4** | Signal Detection | `message_received`, `before_agent_start` | Scans inbound user messages for 50+ injection/exfiltration patterns. Tracks stats, logs high-severity signals, injects warnings into agent context. |
 | **L4+** | External Content Scanner | `tool_result_persist` | Scans tool results from external sources (web_fetch, web_search/Brave, browser, read, exec, image) for indirect prompt injection. 16 specialized patterns + instruction density heuristic. |
 | **LC** | Privilege Separation | `before_tool_call`, `message_received` | When L4+ detects high-severity injection in external content, **blocks dangerous tools** (exec, write, edit, message, gateway) until the next user message. Enforced at gateway level — the agent cannot override it. |
+| **LF** | File Write Guard | `before_tool_call` | Blocks agent write/edit/exec operations targeting critical files (SOUL.md, AGENTS.md, openclaw.json). Enforced at gateway level — the agent cannot modify its own identity or config. Requires full process restart to activate. |
 | **🐤** | Canary Token | `before_agent_start`, `tool_result_persist` | Injects a random secret token into agent context. If any external content contains this token, it proves the system prompt was exfiltrated. Persistent alert on detection. |
 
 ### Advisory Layers (code ready, waiting for full hook support)
