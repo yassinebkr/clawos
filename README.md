@@ -221,6 +221,147 @@ If the canary appears in any tool result, it means:
 
 On detection: `logger.error` + daily memory log + persistent flag in `/clawos` status.
 
+## Token & Cost Management
+
+ClawOS works alongside OpenClaw's built-in cost controls. These aren't part of the plugin itself — they're OpenClaw gateway settings — but they're **essential** for preventing runaway API costs. A single heavy session without these safeguards can burn $100+ in hours.
+
+### The Problem
+
+Without tuning, OpenClaw defaults are permissive:
+- **Context pruning** is off — old tool results accumulate forever in context
+- **Compaction reserve** is only ~16k tokens — on a 1M context window, compaction won't trigger until ~984k tokens
+- **Sub-agents** may fall back to expensive models (Opus) if the primary model fails
+- **Rate limits** are silent — no error shown to the user when the API stops responding
+
+In a heavy coding session (150+ tool calls in 2 hours), this means:
+- Every API call re-reads the full accumulated context (~100k+ tokens)
+- Anthropic cache_read costs add up: **33M tokens = $50** in reads alone
+- Cache_write on every restart/canary rotation: **3.4M tokens = $63**
+- Total: **$120 burned in one session**
+
+### Recommended OpenClaw Settings
+
+Add these to your `openclaw.json` under `agents.defaults`:
+
+```json
+{
+  "agents": {
+    "defaults": {
+      "contextPruning": {
+        "mode": "cache-ttl",
+        "ttl": "5m",
+        "keepLastAssistants": 3,
+        "softTrimRatio": 0.3,
+        "hardClearRatio": 0.5,
+        "minPrunableToolChars": 50000,
+        "softTrim": {
+          "maxChars": 4000,
+          "headChars": 1500,
+          "tailChars": 1500
+        },
+        "hardClear": {
+          "enabled": true,
+          "placeholder": "[Old tool result cleared]"
+        }
+      },
+      "compaction": {
+        "mode": "default",
+        "reserveTokensFloor": 200000,
+        "memoryFlush": {
+          "enabled": true,
+          "softThresholdTokens": 50000
+        }
+      },
+      "memorySearch": {
+        "enabled": true,
+        "sources": ["memory", "sessions"],
+        "provider": "local",
+        "sync": {
+          "onSessionStart": true,
+          "onSearch": true,
+          "watch": true
+        }
+      },
+      "subagents": {
+        "maxConcurrent": 8,
+        "model": {
+          "primary": "google-gemini-cli/gemini-3-pro-preview",
+          "fallbacks": ["anthropic/claude-sonnet-4-6"]
+        }
+      }
+    }
+  }
+}
+```
+
+### What Each Setting Does
+
+| Setting | What it does | Why it matters |
+|---------|-------------|----------------|
+| **contextPruning.mode: "cache-ttl"** | Trims old tool results after Anthropic cache expires (5min) | Prevents tool output from accumulating forever. Biggest cost saver. |
+| **contextPruning.softTrim** | Keeps head + tail of oversized tool results, inserts `...` | Preserves useful context while cutting size |
+| **contextPruning.hardClear** | Replaces very old tool results with a placeholder | Aggressively reclaims space for results beyond the hard-clear threshold |
+| **compaction.reserveTokensFloor: 200000** | Compaction triggers at ~800k (instead of ~984k) | Earlier compaction = smaller context per API call = lower cost |
+| **compaction.memoryFlush.enabled** | Writes important context to disk before compaction | Nothing critical is lost when older messages are summarized |
+| **memorySearch.enabled** | Vector search over memory files and session transcripts | Agent can recall past context without keeping it all in the window |
+| **memorySearch.provider: "local"** | Uses local embeddings (no API cost) | Zero-cost memory search |
+| **subagents.model.primary** | Gemini Pro for sub-agents | Much cheaper than Opus for focused tasks |
+| **subagents.model.fallbacks** | Sonnet 4.6 as fallback (NOT Opus) | Prevents expensive Opus fallback on sub-agent failures |
+
+### Quick Setup
+
+**Automatic (via gateway patch):**
+
+```bash
+# From a chat session, ask the agent to run:
+gateway config.patch with the settings above
+```
+
+**Manual:**
+
+1. Edit `~/.openclaw/openclaw.json`
+2. Add the settings under `agents.defaults`
+3. Also set sub-agent model at the agent level:
+```json
+{
+  "agents": {
+    "list": [{
+      "id": "main",
+      "subagents": {
+        "allowAgents": ["main"],
+        "model": {
+          "primary": "google-gemini-cli/gemini-3-pro-preview",
+          "fallbacks": ["anthropic/claude-sonnet-4-6"]
+        }
+      }
+    }]
+  }
+}
+```
+4. Restart: `openclaw gateway restart`
+
+### Verifying It Works
+
+After applying, check with `/status`:
+- **Context** should show compactions happening (🧹 count > 0) during heavy sessions
+- **Context %** should stay well below 80% instead of growing unbounded
+- Sub-agent spawns should show Gemini or Sonnet, never Opus
+
+To audit a session's token usage:
+```bash
+# Parse session transcript for token stats
+python3 -c "
+import json
+with open('~/.openclaw/agents/main/sessions/<session-id>.jsonl') as f:
+    total = sum(
+        sum(json.loads(l).get('message',{}).get('usage',{}).get(k,0)
+            for k in ['input','output','cacheRead','cacheWrite'])
+        for l in f if l.strip()
+    )
+print(f'Total tokens: {total:,}')
+"
+```
+
 ## Security Model & Limitations
 
 ### What ClawOS defends against
@@ -279,6 +420,9 @@ When testing injection detection, **never read test content in the main session*
 | `before_tool_call` | LC | Privilege separation — block dangerous tools |
 
 ## Changelog
+
+### 0.5.1 (2026-02-18)
+- **Token & Cost Management guide** — documented recommended OpenClaw settings for context pruning, compaction, memory search, and sub-agent model config. Includes root cause analysis of $120 token leak, quick setup instructions, and verification steps.
 
 ### 0.5.0 (2026-02-17)
 - **L0: Disk persistence for runtime repairs** — error-terminated tool calls repaired in `before_agent_start` are now written back to the JSONL session file (with backup). Prevents repair loops on restart that could brick sessions.
